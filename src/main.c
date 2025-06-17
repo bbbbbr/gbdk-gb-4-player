@@ -5,6 +5,8 @@
 #include "input.h"
 #include "fade.h"
 
+#include "4_player_adapter.h"
+
 
 static void main_init(void) {
 
@@ -13,9 +15,10 @@ static void main_init(void) {
     DISPLAY_ON;
 	UPDATE_KEYS();
 
-    fade_out(FADE_DELAY_NORM, BG_PAL_TITLE);
+    // fade_out(FADE_DELAY_NORM, BG_PAL_TITLE);
     SHOW_BKG;
     SHOW_SPRITES;
+    // fade_in(FADE_DELAY_NORM, BG_PAL_TITLE);
 }
 
 
@@ -23,7 +26,12 @@ void main(void){
 
     main_init();
 
+    four_player_init();
+    four_player_enable();
+
     while (1) {
         vsync();
+        
+        four_player_log();
     }
 }
