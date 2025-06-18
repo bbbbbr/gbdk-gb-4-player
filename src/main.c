@@ -7,18 +7,24 @@
 
 #include "4_player_adapter.h"
 
+#include "title_screen.h"
+
+
 
 static void main_init(void) {
+
 
     HIDE_BKG;
     HIDE_SPRITES;
     DISPLAY_ON;
-	UPDATE_KEYS();
+    SPRITES_8x16;
 
     // fade_out(FADE_DELAY_NORM, BG_PAL_TITLE);
     SHOW_BKG;
     SHOW_SPRITES;
     // fade_in(FADE_DELAY_NORM, BG_PAL_TITLE);
+
+	UPDATE_KEYS();
 }
 
 
@@ -30,8 +36,6 @@ void main(void){
     four_player_enable();
 
     while (1) {
-        vsync();
-        
-        four_player_log();
+        title_screen_run();
     }
 }
