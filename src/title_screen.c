@@ -77,13 +77,28 @@ static void update_connection_display(void) {
 }
 
 
+static void request_start(void) {
+    four_player_request_change_to_transfer_mode();
+}
+
 void title_screen_run(void){
 
     title_screen_init();
-    UPDATE_KEYS();
 
     while (1) {
+        UPDATE_KEYS();
         vsync();
         update_connection_display();
+
+        if (KEY_TICKED(J_START)) {
+            if (WHICH_PLAYER_AM_I() == PLAYER_1) {
+                request_start();
+            }
+        }
+
+        if (KEY_TICKED(J_SELECT)) {
+            // Try to change mode without checking if it's player 1
+            request_start();
+        }
     }
 }
