@@ -71,7 +71,7 @@ static void update_connection_display(void) {
         (my_player_num <= PLAYER_NUM_MAX)) {
         // If valid player number, highlight which player the current one is
         next_sprite_id = move_metasprite(you_arrow_spr_metasprites[0], SPR_YOU_ARROW_SPR_TILES_START,
-                                         next_sprite_id, you_spr_x[my_player_num - 1], YOU_SPR_Y);
+                                         next_sprite_id, you_spr_x[my_player_num - 1], (uint8_t)YOU_SPR_Y);
     }
     hide_sprites_range(next_sprite_id, MAX_HARDWARE_SPRITES);
 }
