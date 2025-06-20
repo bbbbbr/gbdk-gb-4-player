@@ -77,9 +77,15 @@ static void update_connection_display(void) {
 }
 
 
-static void request_start(void) {
-    four_player_request_change_to_transfer_mode();
+static void start_data_mode(void) {
+    four_player_change_to_xfer_mode();
 }
+
+
+static void restart_ping_mode(void) {
+    four_player_restart_ping_mode();
+}
+
 
 void title_screen_run(void){
 
@@ -92,13 +98,17 @@ void title_screen_run(void){
 
         if (KEY_TICKED(J_START)) {
             if (WHICH_PLAYER_AM_I() == PLAYER_1) {
-                request_start();
+                start_data_mode();
             }
         }
-
-        if (KEY_TICKED(J_SELECT)) {
-            // Try to change mode without checking if it's player 1
-            request_start();
+        else if (KEY_TICKED(J_SELECT)) {
+            // Try to change mode even if this console isn't Player 1
+            // (allowed, but probably not recommended)
+            start_data_mode();
+        }
+        else if (KEY_TICKED(J_B)) {
+            // Try to restart Ping mode
+            restart_ping_mode();
         }
     }
 }
