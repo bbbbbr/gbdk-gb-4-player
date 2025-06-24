@@ -1,5 +1,6 @@
 #include <gbdk/platform.h>
 #include <stdint.h>
+#include <gb/isr.h>
 
 #include <stdio.h>
 #include <gbdk/console.h>
@@ -33,6 +34,15 @@
   - "It’s possible to restart the ping phase while operating in the transmission phase. To do so, the master Game Boy should send 4 or more bytes (FF FF FF FF, it’s possible fewer $FF bytes need to be sent, but this has not been extensively investigated yet). "
     - It appears sufficient to send as few as 3 x 0xFF to restart Ping mode
 
+  - Power is supplied to the adapter from the Player 1 port
+    - Losing power on that port will cause a reset of the device
+
+  - It's possible that any repeating 3(?) byte TX sequence could trigger a reset?
+    - seems to be happening when sending tx data byte + 3 x 0xA5 or 3 x 0x01
+
+  - GBs are ALWAYS external clock
+    - so when docs say "The protocol is simple: Each Game Boy sends a packet to the DMG-07 simultaneously"
+      - They mean "WHEN the GB RXs a packet, it should reply with 
 */
 
 
@@ -42,11 +52,25 @@
 
 
 
-uint8_t _4p_mode;                     // Current mode: Ping -> Switch to Transmission(Xfer) -> Transmission(Xfer)
-uint8_t _4p_mode_state;               // Sub-state within mode
-uint8_t _4p_connect_status;           // 4-Player connection status
-uint8_t _4p_switch_mode_rx_counter; // Track whether 4 x 0xCC has been received in a row (for switching to Transmission(Xfer) mode)
-uint8_t sio_keepalive;                // Monitor SIO rx count to detect disconnects
+uint8_t _4p_mode;                    // Current mode: [Ping] -> [Switching to Transmission(Xfer)] -> [Transmission(Xfer)]
+uint8_t _4p_mode_state;              // Sub-state within current mode
+uint8_t _4p_connect_status;          // 4-Player connection status
+uint8_t _4p_switchmode_cmd_rx_count; // Track whether 4 x 0xCC or 0xFF have been received in a row (signal commands for switching between Ping and Transmission(Xfer) modes)
+
+// Transmission(Xfer) mode vars
+uint8_t _4P_xfer_tx_data;                      // Data to send in tx state
+uint8_t _4p_xfer_count;                        // Tracks number of bytes handled in the various states of Transmission(Xfer) mode
+uint8_t _4p_xfer_rx_buf_sio_active;            // Which of the xfer rx double buffers is active for SIO receiving
+uint8_t   _4p_xfer_rx_buf[2][_4P_XFER_RX_SZ];  // RX Buffer is double buffered to allow access of one while other is filling
+uint8_t * _4p_xfer_sio_rx_buf_ptr;             // Pointer to slice of RX double buffer in use by sio
+bool      _4p_xfer_rx_buf_ready_for_main[2];   // Indicates when a RX buffer is ready for main
+
+uint8_t sio_keepalive;               // Monitor SIO rx count to detect disconnects
+
+
+uint8_t packet_counter;
+uint8_t sio_counter;
+
 
 
 // == State change functions ==
@@ -55,16 +79,15 @@ uint8_t sio_keepalive;                // Monitor SIO rx count to detect disconne
 // (main caller expected to wrap it in critical)
 inline void four_player_reset_no_critical(void) {
     CRITICAL {
-        _4p_mode                   = _4P_STATE_PING;
-        _4p_connect_status         = _4P_CONNECT_NONE;
-        _4p_mode_state             = _4P_PING_STATE_WAIT_HEADER;
-        _4p_switch_mode_rx_counter = _4P_START_XFER_COUNT_RESET;
-        sio_keepalive              = SIO_KEEPALIVE_RESET;
+        _4p_mode                    = _4P_STATE_PING;
+        _4p_connect_status          = _4P_CONNECT_NONE;
+        _4p_mode_state              = _4P_PING_STATE_WAIT_HEADER;
+        _4p_switchmode_cmd_rx_count = _4P_START_XFER_COUNT_RESET;
+        sio_keepalive               = SIO_KEEPALIVE_RESET;
     }
 }
 
 
-// Should be executed wrapped with a critical section
 void four_player_init(void) {
     CRITICAL {
         four_player_reset_no_critical();
@@ -72,8 +95,7 @@ void four_player_init(void) {
 }
 
 
-// Should be executed wrapped with a critical section
-void four_player_change_to_xfer_mode(void) {
+void four_player_request_change_to_xfer_mode(void) {
     CRITICAL {
         _4p_mode       = _4P_STATE_START_XFER;
         _4p_mode_state = _4P_START_XFER_STATE_WAIT_HEADER;
@@ -82,18 +104,48 @@ void four_player_change_to_xfer_mode(void) {
 
 
 // Only called from ISR, no critical section
-void four_player_enter_xfer_mode(void) {
-    _4p_mode                   = _4P_STATE_XFER;
-    _4p_mode_state             = _4P_XFER_STATE_SEND;
-    _4p_switch_mode_rx_counter = _4P_RESTART_PING_COUNT_RESET;
+void four_player_init_xfer_mode(void) {
+    _4p_mode                    = _4P_STATE_XFER;
+    _4p_mode_state              = _4P_XFER_STATE_TX_LOCAL_DATA; // TODO: no sub-state in this mode
+    _4p_switchmode_cmd_rx_count = _4P_RESTART_PING_COUNT_RESET;
+
+    _4p_xfer_count              = _4P_XFER_COUNT_RESET;
+    _4p_xfer_rx_buf_sio_active  = 0u;
+    _4p_xfer_sio_rx_buf_ptr     = _4p_xfer_rx_buf[_4p_xfer_rx_buf_sio_active];
+    _4p_xfer_rx_buf_ready_for_main[0u] = false;
+    _4p_xfer_rx_buf_ready_for_main[1u] = false;
+
+    // TODO: Debug vars
+    packet_counter              = 0u;
+    sio_counter                 = 0u;
 }
 
 
-// Should be executed wrapped with a critical section
 void four_player_restart_ping_mode(void) {
     CRITICAL {
         _4p_mode       = _4P_STATE_RESTART_PING;
         _4p_mode_state = _4P_RESTART_PING_STATE_SENDING1;
+    }
+}
+
+
+void four_player_set_xfer_data(uint8_t tx_byte) {
+    // Don't really need a critical section here since it's read-only from the ISR
+    // CRITICAL {
+        _4P_xfer_tx_data = tx_byte;
+    // }
+}
+
+
+void four_player_claim_active_sio_buffer_for_main(void) {
+    CRITICAL {
+        // TODO: convert _4p_xfer_rx_buf_ready_for_main[] from array to just two vars selected by _4p_xfer_rx_buf_sio_active
+        // Clear ready flag for the buffer claimed by main
+        _4p_xfer_rx_buf_ready_for_main[_4p_xfer_rx_buf_sio_active] = false;
+        
+        // Flip which buffer is active so sio writes into the one not claimed by main
+        _4p_xfer_rx_buf_sio_active = !_4p_xfer_rx_buf_sio_active;
+        _4p_xfer_sio_rx_buf_ptr    = _4p_xfer_rx_buf[_4p_xfer_rx_buf_sio_active];
     }
 }
 
@@ -119,16 +171,14 @@ static inline void sio_handle_mode_ping(uint8_t sio_byte) {
         SB_REG = _4P_REPLY_PING_ACK1;
     }
     else {
+        // TODO: Maybe move this to the main ISR body so it can be shared for all?
         // Monitor for 4 x 0xCC received in a row which means a switch to Transmission(Xfer) mode
         if (sio_byte == _4P_START_XFER_INDICATOR) {
-            _4p_switch_mode_rx_counter++;
-            if (_4p_switch_mode_rx_counter == _4P_START_XFER_COUNT_DONE) {
-                four_player_enter_xfer_mode();
-                gotoxy(1,3);
-                printf("4xCC\n");
+            _4p_switchmode_cmd_rx_count++;
+            if (_4p_switchmode_cmd_rx_count == _4P_START_XFER_COUNT_DONE) {
+                four_player_init_xfer_mode();
             }
-        }
-        else _4p_switch_mode_rx_counter = _4P_START_XFER_COUNT_RESET;
+        } else _4p_switchmode_cmd_rx_count = _4P_START_XFER_COUNT_RESET;
 
         // Otherwise continue normal ping handling
         switch (_4p_mode_state) {
@@ -161,27 +211,31 @@ static inline void sio_handle_mode_ping(uint8_t sio_byte) {
 // the DMG-07 to switch over
 static inline void sio_handle_mode_start_xfer(uint8_t sio_byte) {
 
+    // TODO: This should be consolidated with the ping mode check
+    // Monitor for 4 x 0xCC received in a row which means a switch to Transmission(Xfer) mode
+    if (sio_byte == _4P_START_XFER_INDICATOR) {
+        _4p_switchmode_cmd_rx_count++;
+        if (_4p_switchmode_cmd_rx_count == _4P_START_XFER_COUNT_DONE) {
+            four_player_init_xfer_mode();
+        }
+    } else _4p_switchmode_cmd_rx_count = _4P_START_XFER_COUNT_RESET;
+
     // In Ping phase 0xFE only ever means HEADER,
     // Status packets should never have that value
     if (sio_byte == _4P_PING_HEADER) {
         _4p_mode_state = _4P_START_XFER_STATE_SENDING1;
         SB_REG = _4P_REPLY_START_XFER_CMD;
-
-        gotoxy(1,1);
-        printf("ST-AA\n");
     }
     else if (_4p_mode_state != _4P_START_XFER_STATE_WAIT_HEADER) {
 
         SB_REG = _4P_REPLY_START_XFER_CMD;
 
         // Once the fourth byte has been sent the state should be change into Transmission
-        if (++_4p_mode_state == _4P_START_XFER_STATE_SENDING4) {
-            // TODO: make function handle_switch_to_xfer_mode();
-            // TODO: Reset XFER counter vars
-            _4p_mode       = _4P_STATE_XFER;
-            _4p_mode_state = _4P_XFER_STATE_SEND;
-            gotoxy(1,2);
-            printf("4xAA\n");
+        if (++_4p_mode_state == _4P_START_XFER_STATE_SENDING4) {            
+// TODO: TEMPORARY HACK : Then wait for the ping to transmission mode signal, MAKE THIS A DISTINCT STATE OR RESTRUCTURE
+_4p_mode_state = _4P_START_XFER_STATE_WAIT_HEADER;
+// Don't immediately switch to xfer mode, wait for the signal
+// four_player_init_xfer_mode();
         }
     }
 }
@@ -195,11 +249,8 @@ static inline void sio_handle_mode_restart_ping(void) {
 
     // Once the fourth byte has been sent the state should be reset to Ping
     if (++_4p_mode_state == _4P_RESTART_PING_STATE_SENDING4) {
-            gotoxy(1,4);
-            printf("4xFF\n");
             four_player_reset_no_critical();
     }
-     // else if (++_4p_mode_state == (_4P_RESTART_PING_STATE_SENDING4 + 32))
 }
 
 
@@ -208,28 +259,38 @@ static inline void sio_handle_mode_xfer(uint8_t sio_byte) {
 
     // Monitor for 4 x 0xFF received in a row which means a switch to Transmission(Xfer) mode
     if (sio_byte == _4P_RESTART_PING_INDICATOR) {
-        _4p_switch_mode_rx_counter++;
-        if (_4p_switch_mode_rx_counter == _4P_RESTART_PING_COUNT_DONE) {
+        _4p_switchmode_cmd_rx_count++;
+        if (_4p_switchmode_cmd_rx_count == _4P_RESTART_PING_COUNT_DONE) {
             four_player_reset_no_critical();
-            gotoxy(1,5);
-            printf("4xFF\n");
         }
     }
-    else _4p_switch_mode_rx_counter = _4P_RESTART_PING_COUNT_RESET;
+    else _4p_switchmode_cmd_rx_count = _4P_RESTART_PING_COUNT_RESET;
 
-    // if (_4p_mode_state == _4P_XFER_STATE_SEND) {
 
-    //     SB_REG = // Send buffer from queue
-    //     sio_byte = // Save to some buffer
-    //     _4p_mode_state == _4P_START_XFER_STATE_WAIT_HEADER;
-    //     sio_rx_counter = N * 4 // Expect to received 4 x N bytes
-    // } else {
-    // }
+    // Load local data to send for next reply
+    // During TX padding phase just send zeros (optional, but recommended)
+    if (_4p_xfer_count == 0)
+        SB_REG = 0x80u | (WHICH_PLAYER_AM_I());
+    else if (_4p_xfer_count == 1)
+        SB_REG = _4P_xfer_tx_data;
+    else
+        SB_REG = _4P_XFER_TX_PAD_VALUE;
+
+    // Save the RX data
+    _4p_xfer_sio_rx_buf_ptr[_4p_xfer_count++] = sio_byte;
+
+    // Check for completion of RX state, if so return to initial TX state
+    if (_4p_xfer_count == _4P_XFER_RX_SZ) {
+        _4p_xfer_count = _4P_XFER_COUNT_RESET;
+        _4p_xfer_rx_buf_ready_for_main[_4p_xfer_rx_buf_sio_active] = true;
+        packet_counter++;
+        packet_counter &= 0x0Fu;  // limit to 16
+    }
 }
 
 
-void four_player_sio_isr(void) {
-    // Serial keepalive
+void four_player_sio_isr(void) CRITICAL INTERRUPT {
+    // Serial keep alive
     sio_keepalive = SIO_KEEPALIVE_RESET;
     uint8_t sio_byte = SB_REG;
 
@@ -250,16 +311,21 @@ void four_player_sio_isr(void) {
 
     // Return to listening
     SC_REG = SIOF_XFER_START | SIOF_CLOCK_EXT;
+    // DEBUG
+    sio_counter++;
 }
+
+// Install direct interrupt handler
+ISR_VECTOR(VECTOR_SERIAL, four_player_sio_isr)
 
 
 void four_player_enable(void) {
     CRITICAL {
         // Avoid double-install by trying to remove first
-        remove_SIO(four_player_sio_isr);
+        // remove_SIO(four_player_sio_isr);
         remove_VBL(four_player_vbl_isr);
 
-        add_SIO(four_player_sio_isr);
+        // add_SIO(four_player_sio_isr);
         add_VBL(four_player_vbl_isr);
     }
     set_interrupts(VBL_IFLAG | SIO_IFLAG);
@@ -271,7 +337,7 @@ void four_player_enable(void) {
 
 void four_player_disable(void) {
     CRITICAL {
-        remove_SIO(four_player_sio_isr);
+        // remove_SIO(four_player_sio_isr); // TODO: Change this to a fixed ISR vector for lower overhead
         remove_VBL(four_player_vbl_isr);
     }
     set_interrupts(VBL_IFLAG & ~SIO_IFLAG);

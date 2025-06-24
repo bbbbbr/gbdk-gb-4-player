@@ -1,5 +1,8 @@
 #include <gbdk/platform.h>
 #include <stdint.h>
+#include <string.h>
+#include <stdio.h>
+#include <gbdk/console.h>
 
 #include "common.h"
 #include "input.h"
@@ -67,7 +70,7 @@ static void update_connection_display(void) {
     uint8_t next_sprite_id = 0u;
     uint8_t my_player_num = WHICH_PLAYER_AM_I();
 
-    if ((my_player_num >= PLAYER_NUM_MIN) && 
+    if ((my_player_num >= PLAYER_NUM_MIN) &&
         (my_player_num <= PLAYER_NUM_MAX)) {
         // If valid player number, highlight which player the current one is
         next_sprite_id = move_metasprite(you_arrow_spr_metasprites[0], SPR_YOU_ARROW_SPR_TILES_START,
@@ -76,9 +79,43 @@ static void update_connection_display(void) {
     hide_sprites_range(next_sprite_id, MAX_HARDWARE_SPRITES);
 }
 
+// uint8_t local_player_data[_4P_XFER_RX_SZ];
+// uint8_t local_player_data_alt[_4P_XFER_RX_SZ];
+
+static void handle_player_data(void) {
+
+    uint8_t c;
+/*    // Copy data out of the buffer, THEN use it
+    // TODO: this is double buffered so sio writes into the other, but probably needs a locking mechanism with a critical section to toggle it
+    // (i.e. this end sets which buf is free and sio just writes to the other and doesn't control it - that might result in more latency though vs some kind of "ready" signal)
+    // memcpy(local_player_data, _4p_xfer_rx_buf[GET_INACTIVE_RX_BUF()], _4P_XFER_RX_SZ);
+    memcpy(local_player_data, _4p_xfer_rx_buf, _4P_XFER_RX_SZ);
+    memcpy(local_player_data_alt, _4p_xfer_rx_buf_alt, _4P_XFER_RX_SZ);
+*/
+    // This also releases 
+    four_player_claim_active_sio_buffer_for_main();
+
+    gotoxy(1, 4);
+    printf("clm=%hu\n", (uint8_t)_4p_xfer_rx_buf_sio_active);
+
+    for (c = 0; c < _4P_XFER_RX_SZ; c++) {
+        if ((c & 0x3) == 0)
+            printf("\n");
+        printf("%hx,", (uint8_t)_4p_xfer_rx_buf[0][c]);
+    }
+
+    printf("\n");
+    for (c = 0; c < _4P_XFER_RX_SZ; c++) {
+        if ((c & 0x3) == 0)
+            printf("\n");
+        printf("%hx,", (uint8_t)_4p_xfer_rx_buf[1][c]);
+    }
+
+}
+
 
 static void start_data_mode(void) {
-    four_player_change_to_xfer_mode();
+    four_player_request_change_to_xfer_mode();
 }
 
 
@@ -94,7 +131,23 @@ void title_screen_run(void){
     while (1) {
         UPDATE_KEYS();
         vsync();
-        update_connection_display();
+
+        if (GET_CURRENT_MODE() == _4P_STATE_PING) {
+            update_connection_display();
+        }
+        else if (GET_CURRENT_MODE() == _4P_STATE_XFER) {
+            // Load TX data for next frame first
+            four_player_set_xfer_data(keys & J_DPAD);  // TODO: lightweight checksum or etc on transmitted and received data
+
+            gotoxy(1, 0);
+            printf("%hx,%hx", (uint8_t)sio_counter, (uint8_t)packet_counter);
+
+            if (IS_PLAYER_DATA_READY()) {
+                handle_player_data();
+            }
+        }
+
+
 
         if (KEY_TICKED(J_START)) {
             if (WHICH_PLAYER_AM_I() == PLAYER_1) {
@@ -108,6 +161,7 @@ void title_screen_run(void){
         }
         else if (KEY_TICKED(J_B)) {
             // Try to restart Ping mode
+            cls();
             restart_ping_mode();
         }
     }
