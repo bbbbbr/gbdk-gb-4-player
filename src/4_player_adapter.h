@@ -7,8 +7,19 @@
 #define SIO_KEEPALIVE_RESET   60u
 #define SIO_KEEPALIVE_TIMEOUT 0u
 
-// #define _4P_XFER_SZ 1 // Use 1 Byte as total data size in Transmission(Xfer) mode
-#define _4P_XFER_SZ  2
+// DEBUG
+#define CAP_SIZE 32u
+extern bool    cap_enabled;
+extern bool    cap_ready;
+extern uint8_t cap_count;
+extern uint8_t cap_rx_buf[CAP_SIZE];
+extern uint8_t cap_tx_buf[CAP_SIZE];
+
+void cap_reset(void);
+
+
+#define _4P_XFER_SZ 1 // Use 1 Byte as total data size in Transmission(Xfer) mode
+// #define _4P_XFER_SZ  2 // 4
 
 // #if (_4P_XFER_SZ  > 1)
 //     #error "COMPILE FAIL: _4P_XFER_SZ TX data size larger than 1 byte not supported, to do that add tx buffer support in state _4P_XFER_STATE_TX_LOCAL_DATA of sio_handle_mode_xfer()"

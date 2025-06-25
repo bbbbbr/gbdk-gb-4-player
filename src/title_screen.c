@@ -79,38 +79,35 @@ static void update_connection_display(void) {
     hide_sprites_range(next_sprite_id, MAX_HARDWARE_SPRITES);
 }
 
-// uint8_t local_player_data[_4P_XFER_RX_SZ];
-// uint8_t local_player_data_alt[_4P_XFER_RX_SZ];
 
 static void handle_player_data(void) {
 
     uint8_t c;
-/*    // Copy data out of the buffer, THEN use it
-    // TODO: this is double buffered so sio writes into the other, but probably needs a locking mechanism with a critical section to toggle it
-    // (i.e. this end sets which buf is free and sio just writes to the other and doesn't control it - that might result in more latency though vs some kind of "ready" signal)
-    // memcpy(local_player_data, _4p_xfer_rx_buf[GET_INACTIVE_RX_BUF()], _4P_XFER_RX_SZ);
-    memcpy(local_player_data, _4p_xfer_rx_buf, _4P_XFER_RX_SZ);
-    memcpy(local_player_data_alt, _4p_xfer_rx_buf_alt, _4P_XFER_RX_SZ);
-*/
-    // This also releases 
     four_player_claim_active_sio_buffer_for_main();
 
-    gotoxy(1, 4);
-    printf("clm=%hu\n", (uint8_t)_4p_xfer_rx_buf_sio_active);
-
+    gotoxy(1, 2);
     for (c = 0; c < _4P_XFER_RX_SZ; c++) {
         if ((c & 0x3) == 0)
             printf("\n");
         printf("%hx,", (uint8_t)_4p_xfer_rx_buf[0][c]);
     }
+}
 
-    printf("\n");
-    for (c = 0; c < _4P_XFER_RX_SZ; c++) {
-        if ((c & 0x3) == 0)
+static void dump_cap(void) {
+
+    cap_ready = false;
+    uint8_t c;
+
+    gotoxy(1, 4);
+    for (c = 0; c < CAP_SIZE; c++) {
+        if (((c + 1) % 3) == 0)
             printf("\n");
-        printf("%hx,", (uint8_t)_4p_xfer_rx_buf[1][c]);
+        // Cursed unfixed var args casting SDCC Bug #3172
+        // https://sourceforge.net/p/sdcc/bugs/3172/
+        uint8_t rx = (uint8_t)cap_rx_buf[c];
+        uint8_t tx = (uint8_t)cap_tx_buf[c];
+        printf("%hx,%hx|", (uint8_t)rx, (uint8_t)tx);
     }
-
 }
 
 
@@ -132,15 +129,22 @@ void title_screen_run(void){
         UPDATE_KEYS();
         vsync();
 
+
+        gotoxy(1, 0);
+        printf("%hx,%hx,%hx", (uint8_t)cap_enabled, (uint8_t)cap_ready, (uint8_t)cap_count);
+        // printf("%hx,%hx", (uint8_t)sio_counter, (uint8_t)packet_counter);
+
+        if (cap_ready) {
+            dump_cap();
+        }
+
+
         if (GET_CURRENT_MODE() == _4P_STATE_PING) {
             update_connection_display();
         }
         else if (GET_CURRENT_MODE() == _4P_STATE_XFER) {
             // Load TX data for next frame first
             four_player_set_xfer_data(keys & J_DPAD);  // TODO: lightweight checksum or etc on transmitted and received data
-
-            gotoxy(1, 0);
-            printf("%hx,%hx", (uint8_t)sio_counter, (uint8_t)packet_counter);
 
             if (IS_PLAYER_DATA_READY()) {
                 handle_player_data();
@@ -163,6 +167,11 @@ void title_screen_run(void){
             // Try to restart Ping mode
             cls();
             restart_ping_mode();
+        }
+        else if (KEY_TICKED(J_A)) {
+            // Try to restart Ping mode
+            cap_reset();
+            cap_enabled = true;
         }
     }
 }
