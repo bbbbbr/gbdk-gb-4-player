@@ -93,23 +93,6 @@ static void handle_player_data(void) {
     }
 }
 
-static void dump_cap(void) {
-
-    cap_ready = false;
-    uint8_t c;
-
-    gotoxy(1, 4);
-    for (c = 0; c < CAP_SIZE; c++) {
-        if (((c + 1) % 3) == 0)
-            printf("\n");
-        // Cursed unfixed var args casting SDCC Bug #3172
-        // https://sourceforge.net/p/sdcc/bugs/3172/
-        uint8_t rx = (uint8_t)cap_rx_buf[c];
-        uint8_t tx = (uint8_t)cap_tx_buf[c];
-        printf("%hx,%hx|", (uint8_t)rx, (uint8_t)tx);
-    }
-}
-
 
 static void start_data_mode(void) {
     four_player_request_change_to_xfer_mode();
@@ -130,13 +113,14 @@ void title_screen_run(void){
         vsync();
 
 
-        gotoxy(1, 0);
-        printf("%hx,%hx,%hx", (uint8_t)cap_enabled, (uint8_t)cap_ready, (uint8_t)cap_count);
+        // gotoxy(1, 0);
         // printf("%hx,%hx", (uint8_t)sio_counter, (uint8_t)packet_counter);
 
-        if (cap_ready) {
-            dump_cap();
-        }
+        #ifdef SIO_CAPTURE_ENABLED
+            if (capture_ready) {
+                capture_dump();
+            }
+        #endif
 
 
         if (GET_CURRENT_MODE() == _4P_STATE_PING) {
@@ -169,9 +153,10 @@ void title_screen_run(void){
             restart_ping_mode();
         }
         else if (KEY_TICKED(J_A)) {
-            // Try to restart Ping mode
-            cap_reset();
-            cap_enabled = true;
+            #ifdef SIO_CAPTURE_ENABLED
+                capture_reset();
+                capture_enabled = true;
+            #endif
         }
     }
 }
