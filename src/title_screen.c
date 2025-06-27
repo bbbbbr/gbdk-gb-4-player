@@ -1,8 +1,6 @@
 #include <gbdk/platform.h>
 #include <stdint.h>
 #include <string.h>
-#include <stdio.h>
-#include <gbdk/console.h>
 
 #include "common.h"
 #include "input.h"
@@ -12,12 +10,16 @@
 
 #include "title_bg.h"
 #include "checkbox.h"
+#include "font_nums.h"
 #include "you_arrow_spr.h"
 
 #define BG_TITLE_BG_TILES_START      0u
 #define BG_CHECKBOX_TILES_START      (BG_TITLE_BG_TILES_START + title_bg_TILE_COUNT)
   #define BG_CHECKBOX_TILE_UNCHECKED (BG_CHECKBOX_TILES_START + 0)
   #define BG_CHECKBOX_TILE_CHECKED   (BG_CHECKBOX_TILES_START + 1)
+#define BG_FONT_NUMS_TILES_START     (BG_CHECKBOX_TILES_START + checkbox_TILE_COUNT)
+
+#define BLANK_TILE (BG_TITLE_BG_TILES_START)
 
 #define SPR_YOU_ARROW_SPR_TILES_START  0u
 
@@ -42,6 +44,7 @@ static void title_screen_init(void) {
                        (title_bg_HEIGHT / title_bg_TILE_H), title_bg_map);
 
     set_bkg_data((uint8_t)BG_CHECKBOX_TILES_START, checkbox_TILE_COUNT, checkbox_tiles);
+    set_bkg_data((uint8_t)BG_FONT_NUMS_TILES_START, font_nums_TILE_COUNT, font_nums_tiles);
 
     set_sprite_data(SPR_YOU_ARROW_SPR_TILES_START, you_arrow_spr_TILE_COUNT, you_arrow_spr_tiles);
     hide_sprites_range(0, MAX_HARDWARE_SPRITES);
@@ -80,17 +83,24 @@ static void update_connection_display(void) {
 }
 
 
+#define DISPLAY_BUF_SZ (_4P_XFER_RX_SZ * 3)
+uint8_t display_buf[DISPLAY_BUF_SZ];
+
 static void handle_player_data(void) {
 
-    uint8_t c;
     four_player_claim_active_sio_buffer_for_main();
 
-    gotoxy(1, 2);
+    uint8_t c;
+    uint8_t * p_display_buf = display_buf;
     for (c = 0; c < _4P_XFER_RX_SZ; c++) {
-        if ((c & 0x3) == 0)
-            printf("\n");
-        printf("%hx,", (uint8_t)_4p_xfer_rx_buf[0][c]);
+
+        // Print hex bytes separated by spaces
+        uint8_t value = _4p_xfer_rx_buf[0][c];
+        *p_display_buf++ = (value >> 4) + BG_FONT_NUMS_TILES_START;
+        *p_display_buf++ = (value & 0x0F) + BG_FONT_NUMS_TILES_START;
+        *p_display_buf++ = BLANK_TILE;
     }
+    set_bkg_tiles(0,0, DISPLAY_BUF_SZ, 1, display_buf);
 }
 
 
@@ -111,10 +121,6 @@ void title_screen_run(void){
     while (1) {
         UPDATE_KEYS();
         vsync();
-
-
-        // gotoxy(1, 0);
-        // printf("%hx,%hx", (uint8_t)sio_counter, (uint8_t)packet_counter);
 
         #ifdef SIO_CAPTURE_ENABLED
             if (capture_ready) {
@@ -139,24 +145,29 @@ void title_screen_run(void){
 
         if (KEY_TICKED(J_START)) {
             if (WHICH_PLAYER_AM_I() == PLAYER_1) {
-                start_data_mode();
+                if (GET_CURRENT_MODE() != _4P_STATE_XFER) {
+                    start_data_mode();
+                }
             }
         }
         else if (KEY_TICKED(J_SELECT)) {
-            // Try to change mode even if this console isn't Player 1
-            // (allowed, but probably not recommended)
-            start_data_mode();
+            if (GET_CURRENT_MODE() != _4P_STATE_XFER) {
+                // Try to change mode even if this console isn't Player 1
+                // (allowed, but probably not recommended)
+                start_data_mode();
+            }
         }
         else if (KEY_TICKED(J_B)) {
-            // Try to restart Ping mode
-            cls();
-            restart_ping_mode();
+            if (GET_CURRENT_MODE() != _4P_STATE_PING) {
+                // Try to restart Ping mode
+                restart_ping_mode();
+            }
         }
-        else if (KEY_TICKED(J_A)) {
-            #ifdef SIO_CAPTURE_ENABLED
+        #ifdef SIO_CAPTURE_ENABLED
+            else if (KEY_TICKED(J_A)) {
                 capture_reset();
                 capture_enabled = true;
-            #endif
-        }
+            }
+        #endif
     }
 }

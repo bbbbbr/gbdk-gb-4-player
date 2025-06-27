@@ -1,1 +1,1 @@
--map -noflip -tiles_only
+-map -noflip -tiles_only -keep_palette_order
