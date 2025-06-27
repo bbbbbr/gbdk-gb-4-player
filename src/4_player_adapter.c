@@ -51,15 +51,25 @@
   - Given some unknown conditions, starting Transmission(Xfer) mode can begin broadcasting random garbage data to all platers
     - The Restart-ping and Start-Transmission modes have no effect when the adapter is in this state
 
+  - The transmission rate is not continuous
+    - There seems to be some kind of larger interval between groups of transmitted bytes
+      - The size looks variable based on the speed (large gap with faster speed, smaller gap with slower speed)
+    - Speed 0x00 -> 13 scanlines between RX bytes -> ((1000 ÷ 59.7) ÷ 254) × 13 = 0.86 msec
+      - docs calc: msec per byte: (1000 / ((4194304 ÷ ((6 × 0) + 512)) ÷ 8)) = 0.977 msec
+    - Speed 0xFF -> 23 scanlines between RX bytes -> ((1000 ÷ 59.7) ÷ 254) × 23 = 1.57 msec
+      - docs calc: msec per byte: (1000 / ((4194304 ÷ ((6 × 255) + 512)) ÷ 8)) = 3.895 msec
+
 */
 
 
 // Implementation for using the OEM DMG-07 4-Player adapter
 
 // TODO: filter briefly unstable connection status values when link cable unplugged
-// TODO: filter out first couple packets in xfer mode
+// TODO: filter out first (couple?) packet(s?) in xfer mode
 // TODO: implement loopback alignment check? (i.e.  know what last tx was, if next own rx doesn't match try skipping by +1 packet to re-align->repeat until working)
 // TODO: block start xfer mode when already in xfer mode , maybe throw error
+// TODO: deal with sio isr exiting at unsafe times and causing video glitches - benchmarking shows it's prob ok to burn a line here and there to exit at safe times
+// TODO: current method of claiming the sio buffer does not guarantee a complete buffer, needs to be "claim next buffer" which triggers on completion of a full xfer
 
 
 uint8_t _4p_mode;                    // Current mode: [Ping] -> [Switching to Transmission(Xfer)] -> [Transmission(Xfer)]
@@ -207,7 +217,7 @@ void four_player_vbl_isr(void) {
 }
 
 
-static inline void sio_handle_mode_ping(uint8_t sio_byte) {
+static void sio_handle_mode_ping(uint8_t sio_byte) {
     // In Ping phase 0xFE only ever means HEADER,
     // Status packets should never have that value
     if (sio_byte == _4P_PING_HEADER) {
@@ -261,7 +271,9 @@ static inline void sio_handle_mode_ping(uint8_t sio_byte) {
                 _4p_mode_state = _4P_PING_HEADER;   // Packet should wrap around to header again
                 break;
 
-            // Implied non-action: case _4P_PING_STATE_WAIT_HEADER:
+            // Implied non-action: case _4P_PING_STATE_WAIT_HEADER -> load zero as TX placeholder
+            default:
+                SB_REG = _4P_XFER_TX_PAD_VALUE;
         }
 
     }
@@ -273,7 +285,7 @@ static inline void sio_handle_mode_ping(uint8_t sio_byte) {
 // the DMG-07 to switch over
 //
 // This should only be called while the hardware is in PING mode
-static inline void sio_handle_mode_start_xfer(uint8_t sio_byte) {
+static void sio_handle_mode_start_xfer(uint8_t sio_byte) {
     // Wait for Ping header to align start of command transmission (not sure this is required)
     if (sio_byte == _4P_PING_HEADER) {
         _4p_mode_state = _4P_START_XFER_STATE_SENDING1;
@@ -296,7 +308,7 @@ static inline void sio_handle_mode_start_xfer(uint8_t sio_byte) {
 
 
 // Try to revert to Ping mode from Transmission(Xfer) mode by sending 4 x 0xFF
-static inline void sio_handle_mode_restart_ping(void) {
+static void sio_handle_mode_restart_ping(void) {
 
     // Send restart ping command bytes regardless of what is being received
     SB_REG = _4P_REPLY_RESTART_PING_CMD;
@@ -309,7 +321,7 @@ static inline void sio_handle_mode_restart_ping(void) {
 
 
 // Data Transmission(Xfer) state
-static inline void sio_handle_mode_xfer(uint8_t sio_byte) {
+static void sio_handle_mode_xfer(uint8_t sio_byte) {
 
     // Monitor for 4 x 0xFF received in a row which means a switch to Transmission(Xfer) mode
     if (sio_byte == _4P_RESTART_PING_INDICATOR) {
@@ -345,23 +357,25 @@ static inline void sio_handle_mode_xfer(uint8_t sio_byte) {
 
 
 void four_player_sio_isr(void) CRITICAL INTERRUPT {
+
+    #ifdef DISPLAY_SIO_ISR_DURATION_IN_BGP
+        BGP_REG = ~BGP_REG;
+    #endif
+
     // Serial keep alive
     sio_keepalive = SIO_KEEPALIVE_RESET;
     uint8_t sio_byte = SB_REG;
 
-    switch (_4p_mode) {
-        case _4P_STATE_PING:
-            sio_handle_mode_ping(sio_byte); break;
 
-        case _4P_STATE_START_XFER:
-            sio_handle_mode_start_xfer(sio_byte); break;
-
-        case _4P_STATE_XFER:
-            sio_handle_mode_xfer(sio_byte); break;
-
-        case _4P_STATE_RESTART_PING:
-            sio_handle_mode_restart_ping(); break;
-    }
+    // More complex mode handlers first
+    if (_4p_mode == _4P_STATE_PING)
+        sio_handle_mode_ping(sio_byte);
+    else if (_4p_mode == _4P_STATE_XFER)
+        sio_handle_mode_xfer(sio_byte);
+    else if (_4p_mode == _4P_STATE_START_XFER)
+        sio_handle_mode_start_xfer(sio_byte);
+    else if (_4p_mode == _4P_STATE_RESTART_PING)
+        sio_handle_mode_restart_ping();
 
     // DEBUG, capture RX Incoming and TX Reply data, signal to dump buf when full
     #ifdef SIO_CAPTURE_ENABLED
@@ -379,6 +393,10 @@ void four_player_sio_isr(void) CRITICAL INTERRUPT {
     #endif
     // Return to listening
     SC_REG = SIOF_XFER_START | SIOF_CLOCK_EXT;
+
+    #ifdef DISPLAY_SIO_ISR_DURATION_IN_BGP
+        BGP_REG = ~BGP_REG;
+    #endif
 }
 
 // Install direct interrupt handler
@@ -388,10 +406,8 @@ ISR_VECTOR(VECTOR_SERIAL, four_player_sio_isr)
 void four_player_enable(void) {
     CRITICAL {
         // Avoid double-install by trying to remove first
-        // remove_SIO(four_player_sio_isr);
         remove_VBL(four_player_vbl_isr);
 
-        // add_SIO(four_player_sio_isr);
         add_VBL(four_player_vbl_isr);
     }
     set_interrupts(VBL_IFLAG | SIO_IFLAG);

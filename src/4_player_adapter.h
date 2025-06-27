@@ -67,9 +67,13 @@ enum {
     #define _4P_REPLY_PING_ACK1       0x88u
     #define _4P_REPLY_PING_ACK2       0x88u
     // SPEED:
-    // DMG-07 Bits-Per-Second --> 4194304 / ((6 * RATE) + 512)
+    // DMG-07 Bits-Per-Second --> 4194304 / ((6 * SPEED) + 512)
+    // Rough Bytes per frame: (((4194304 ÷ ((6 × SPEED) + 512)) ÷ 8) ÷ 59.7)
+    // Rough MSec per byte:   (1000 / ((4194304 ÷ ((6 × SPEED) + 512)) ÷ 8))
+    //
     // 0x00 = Fastest, 0xFF = slowest
-    #define _4P_REPLY_PING_SPEED      0x00u
+
+    #define _4P_REPLY_PING_SPEED      0u  // 255u // ~256.7 bytes per second // 85u  // ~513 bytes per second // 0x00u // 1024 bytes per second
     // SIZE sets the length of packets exchanged between all Game Boys. Nothing fancy, just the number of bytes in each packet. It probably shouldn’t be set to zero.
     #define _4P_REPLY_PING_PAKCET_SZ (_4P_XFER_SZ) // Reply
 
