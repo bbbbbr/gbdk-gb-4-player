@@ -88,36 +88,6 @@ bool      _4p_xfer_rx_buf_ready_for_main[2];   // Indicates when a RX buffer is 
 uint8_t sio_keepalive;               // Monitor SIO rx count to detect disconnects
 
 
-#ifdef SIO_CAPTURE_ENABLED
-    bool    capture_enabled;
-    bool    capture_ready;
-    uint8_t capture_count;
-    uint8_t capture_rx_buf[CAPTURE_SIZE];
-    uint8_t capture_tx_buf[CAPTURE_SIZE];
-
-    void capture_reset(void) {
-        capture_ready = false;
-        capture_count = 0;
-        capture_enabled = false;
-    }
-
-    void capture_dump(void) {
-        capture_ready = false;
-        uint8_t c;
-
-        gotoxy(1, 4);
-        for (c = 0; c < CAPTURE_SIZE; c++) {
-            if (((c + 1) % 3) == 0)
-                printf("\n");
-            // Cursed unfixed var args casting SDCC Bug #3172
-            // https://sourceforge.net/p/sdcc/bugs/3172/
-            uint8_t rx = (uint8_t)capture_rx_buf[c];
-            uint8_t tx = (uint8_t)capture_tx_buf[c];
-            printf("%hx,%hx|", (uint8_t)rx, (uint8_t)tx);
-        }
-    }
-#endif
-
 
 // == State change functions ==
 
@@ -135,9 +105,6 @@ inline void four_player_reset_to_ping_no_critical(void) {
 
 
 void four_player_init(void) {
-    #ifdef SIO_CAPTURE_ENABLED
-        capture_reset();
-    #endif
 
     CRITICAL {
         four_player_reset_to_ping_no_critical();
@@ -146,13 +113,6 @@ void four_player_init(void) {
 
 
 void four_player_request_change_to_xfer_mode(void) {
-
-    #ifdef SIO_CAPTURE_ENABLED
-        #ifdef SIO_CAPTURE_AND_DUMP_ON_RX_REQUEST_START_XFER
-            capture_reset();
-            capture_enabled = true;
-        #endif
-    #endif
 
     CRITICAL {
         _4p_mode       = _4P_STATE_START_XFER;
@@ -229,16 +189,6 @@ static void sio_handle_mode_ping(uint8_t sio_byte) {
         // Monitor for 4 x 0xCC received in a row which means a switch to Transmission(Xfer) mode
         if (sio_byte == _4P_START_XFER_INDICATOR) {
             _4p_switchmode_cmd_rx_count++;
-
-            #ifdef SIO_CAPTURE_ENABLED
-                #ifdef SIO_AUTO_CAPTURE_AND_DUMP_ON_RX_START_XFER
-                    // DEBUG: trigger a capture whenever possibly switching into Xfer mode
-                    if ((_4p_switchmode_cmd_rx_count == 2) && (capture_enabled == false)  && (capture_ready == false))  {
-                        capture_count = 0;
-                        capture_enabled = true;
-                    }
-                #endif
-            #endif
 
             // When final byte of sequence is received, switch to Transmission(Xfer) mode
             if (_4p_switchmode_cmd_rx_count == _4P_START_XFER_COUNT_DONE) {
@@ -377,20 +327,6 @@ void four_player_sio_isr(void) CRITICAL INTERRUPT {
     else if (_4p_mode == _4P_STATE_RESTART_PING)
         sio_handle_mode_restart_ping();
 
-    // DEBUG, capture RX Incoming and TX Reply data, signal to dump buf when full
-    #ifdef SIO_CAPTURE_ENABLED
-        if (capture_enabled) {
-            if (capture_count < CAPTURE_SIZE) {
-                capture_rx_buf[capture_count] = sio_byte;
-                capture_tx_buf[capture_count] = SB_REG;
-                capture_count++;
-                if (capture_count == CAPTURE_SIZE) {
-                    capture_enabled = false;
-                    capture_ready = true;
-                }
-            }
-        }
-    #endif
     // Return to listening
     SC_REG = SIOF_XFER_START | SIOF_CLOCK_EXT;
 

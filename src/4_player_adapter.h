@@ -4,19 +4,6 @@
 #include "common.h"
 
 
-#ifdef SIO_CAPTURE_ENABLED
-    // DEBUG
-    #define CAPTURE_SIZE 32u
-    extern bool    capture_enabled;
-    extern bool    capture_ready;
-    extern uint8_t capture_count;
-    extern uint8_t capture_rx_buf[CAPTURE_SIZE];
-    extern uint8_t capture_tx_buf[CAPTURE_SIZE];
-
-    void capture_reset(void);
-    void capture_dump(void);
-#endif
-
 #define SIO_KEEPALIVE_RESET   60u
 #define SIO_KEEPALIVE_TIMEOUT 0u
 

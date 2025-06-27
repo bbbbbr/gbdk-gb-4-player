@@ -123,13 +123,6 @@ void title_screen_run(void){
         UPDATE_KEYS();
         vsync();
 
-        #ifdef SIO_CAPTURE_ENABLED
-            if (capture_ready) {
-                capture_dump();
-            }
-        #endif
-
-
         if (GET_CURRENT_MODE() == _4P_STATE_PING) {
             if (title_screen_needs_redraw == true) {
                 title_screen_init();
@@ -169,11 +162,5 @@ void title_screen_run(void){
                 restart_ping_mode();
             }
         }
-        #ifdef SIO_CAPTURE_ENABLED
-            else if (KEY_TICKED(J_A)) {
-                capture_reset();
-                capture_enabled = true;
-            }
-        #endif
     }
 }
