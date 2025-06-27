@@ -116,6 +116,7 @@ static void restart_ping_mode(void) {
 
 void title_screen_run(void){
 
+    bool title_screen_needs_redraw = false;
     title_screen_init();
 
     while (1) {
@@ -130,11 +131,16 @@ void title_screen_run(void){
 
 
         if (GET_CURRENT_MODE() == _4P_STATE_PING) {
+            if (title_screen_needs_redraw == true) {
+                title_screen_init();
+                title_screen_needs_redraw = false;
+            }
             update_connection_display();
         }
         else if (GET_CURRENT_MODE() == _4P_STATE_XFER) {
             // Load TX data for next frame first
             four_player_set_xfer_data(keys & J_DPAD);  // TODO: lightweight checksum or etc on transmitted and received data
+            // four_player_set_xfer_data( 0x80u | WHICH_PLAYER_AM_I());
 
             if (IS_PLAYER_DATA_READY()) {
                 handle_player_data();
