@@ -33,6 +33,15 @@ CFLAGS += -Wf-MMD -Wf-Wp-MP # Header file dependency output (-MMD) for Makefile 
 # Audio driver
 # LCCFLAGS += -Wl-llib/$(PLAT)/hUGEDriver.lib
 
+# Set CGB Boot ROM color palette to 0x13
+# 1. Old Licensee is already 0x33 -> Use New Licensee
+# 2. Sets New Licensee to "01" "(Nintendo)
+# 3. (Calculated by Sum of ROM Header title bytes 0x134 - 0x143) & 0xFF = 0x58 = Grey CGB palette (id:0x16 -> checksum 0x58)  
+#    https://gbdev.io/pandocs/Power_Up_Sequence.html#compatibility-palettes
+#    https://tcrf.net/Notes:Game_Boy_Color_Bootstrap_ROM#Manual_Select_Palette_Configurations
+# Set ROM Title / Name
+LCCFLAGS += -Wm-yn"4PLAYERGBDK?"
+LCCFLAGS += -Wm-yk01
 
 # GBDK_DEBUG = ON
 ifdef GBDK_DEBUG
