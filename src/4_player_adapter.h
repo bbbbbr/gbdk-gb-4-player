@@ -10,9 +10,9 @@
 #define _4P_XFER_SZ 1 // Use 1 Byte as total data size in Transmission(Xfer) mode
 // #define _4P_XFER_SZ  2 // 4
 
-// #if (_4P_XFER_SZ  > 1)
-//     #error "COMPILE FAIL: _4P_XFER_SZ TX data size larger than 1 byte not supported, to do that add tx buffer support in state _4P_XFER_STATE_TX_LOCAL_DATA_AND_RX of sio_handle_mode_xfer()"
-// #endif
+#if (_4P_XFER_SZ  > 1)
+    #error "COMPILE FAIL: _4P_XFER_SZ TX data size larger than 1 byte not supported, to do that add multiple/buffer tx support sio_handle_mode_xfer()"
+#endif
 
 #define PLAYER_NUM_MIN 1u
 #define PLAYER_NUM_MAX 4u
