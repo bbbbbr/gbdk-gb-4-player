@@ -11,7 +11,9 @@
 #include "title_bg.h"
 #include "checkbox.h"
 #include "font_nums.h"
+
 #include "you_arrow_spr.h"
+#include "snake_tiles_spr.h"
 
 #define BG_TITLE_BG_TILES_START      0u
 #define BG_CHECKBOX_TILES_START      (BG_TITLE_BG_TILES_START + title_bg_TILE_COUNT)
@@ -21,7 +23,12 @@
 
 #define BLANK_TILE (BG_TITLE_BG_TILES_START)
 
+
 #define SPR_YOU_ARROW_SPR_TILES_START  0u
+#define SPR_SNAKE_TILES_START         (SPR_YOU_ARROW_SPR_TILES_START + you_arrow_spr_TILE_COUNT)
+  #define SPR_SNAKE_TILE_YOUR_PLYR_HEAD   (SPR_SNAKE_TILES_START + 0)
+  #define SPR_SNAKE_TILE_OTHER_PLYR_HEAD  (SPR_SNAKE_TILES_START + 3)
+
 
 
 #define CHECKBOX_ROW 12u
@@ -47,6 +54,7 @@ static void title_screen_init(void) {
     set_bkg_data((uint8_t)BG_FONT_NUMS_TILES_START, font_nums_TILE_COUNT, font_nums_tiles);
 
     set_sprite_data(SPR_YOU_ARROW_SPR_TILES_START, you_arrow_spr_TILE_COUNT, you_arrow_spr_tiles);
+    set_sprite_data(SPR_SNAKE_TILES_START, snake_tiles_spr_TILE_COUNT, snake_tiles_spr_tiles);
     hide_sprites_range(0, MAX_HARDWARE_SPRITES);
 }
 
@@ -90,7 +98,9 @@ static void handle_player_data(void) {
 
     four_player_claim_active_sio_buffer_for_main();
 
-    uint8_t c;
+    static uint8_t c;
+
+    // Display hex readout for all players
     uint8_t * p_display_buf = display_buf;
     for (c = 0; c < _4P_XFER_RX_SZ; c++) {
 
@@ -101,6 +111,57 @@ static void handle_player_data(void) {
         *p_display_buf++ = BLANK_TILE;
     }
     set_bkg_tiles(0,0, DISPLAY_BUF_SZ, 1, display_buf);
+
+    // Move a sprite for all players
+    uint8_t player_id_bit = _4P_PLAYER_1;
+
+    for (c = 0; c < _4P_XFER_RX_SZ; c++) {
+        if (IS_PLAYER_CONNECTED(player_id_bit)) {
+
+            uint8_t value = _4p_xfer_rx_buf[0][c];
+
+            int8_t x_mv = 0;
+            if      (value & J_LEFT)  x_mv = -1;
+            else if (value & J_RIGHT) x_mv = 1;
+
+            int8_t y_mv = 0;
+            if      (value & J_UP)   y_mv = -1;
+            else if (value & J_DOWN) y_mv = 1;
+
+            scroll_sprite(c, x_mv, y_mv);
+        }
+        player_id_bit <<= 1;
+    }
+
+}
+
+
+// Temp for now, ultimately in separate file
+static void handle_game_screen_init(void) {
+
+    // Cover title screen info
+    fill_bkg_rect(0,0,DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT, BLANK_TILE);
+
+    // Set up player sprites
+    uint8_t my_player_num = WHICH_PLAYER_AM_I();
+    uint8_t player_id_bit = _4P_PLAYER_1;
+
+    for (uint8_t c = 0; c < PLAYER_NUM_MAX; c++) {
+
+        if (IS_PLAYER_CONNECTED(player_id_bit)) {
+            // Use different sprite tile for this player vs others
+            uint8_t tile_id = (my_player_num == (c + 1)) ? SPR_SNAKE_TILE_YOUR_PLYR_HEAD : SPR_SNAKE_TILE_OTHER_PLYR_HEAD;
+            set_sprite_tile(c, tile_id);
+
+            uint8_t xinit = (c + 1) * (DEVICE_SCREEN_PX_WIDTH  / (PLAYER_NUM_MAX + 1));
+            uint8_t yinit =     (DEVICE_SCREEN_PX_HEIGHT / 2u);
+            move_sprite(c, xinit, yinit);
+        }
+        else hide_sprite(c);
+
+        player_id_bit <<= 1;
+    }
+    hide_sprites_range(PLAYER_NUM_MAX, MAX_HARDWARE_SPRITES);
 }
 
 
@@ -136,9 +197,7 @@ void title_screen_run(void){
         }
         else if (GET_CURRENT_MODE() == _4P_STATE_XFER) {
             if (next_xfer_mode_redraw == true) {
-                // Hide all sprites and cover title screen info
-                fill_bkg_rect(0,0,DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT, BLANK_TILE);
-                hide_sprites_range(0, MAX_HARDWARE_SPRITES);
+                handle_game_screen_init();
                 next_ping_mode_redraw = true;
                 next_xfer_mode_redraw = false;
             }
