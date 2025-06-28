@@ -340,7 +340,7 @@ static void sio_handle_mode_xfer(uint8_t sio_byte) {
         // (this is end of packet, so *next* transfer is when the first
         //  ping restart command gets loaded as the reply to the first packet byte)
         if (_4p_mode_state == _4P_XFER_STATE_WAIT_ALIGN_RESTART_PING_CMD) {
-            Z();
+            four_player_begin_send_ping_mode_cmd();
         }
     }
 }
