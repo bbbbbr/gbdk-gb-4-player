@@ -11,7 +11,7 @@
 // #define _4P_XFER_SZ  2 // 4
 
 // #if (_4P_XFER_SZ  > 1)
-//     #error "COMPILE FAIL: _4P_XFER_SZ TX data size larger than 1 byte not supported, to do that add tx buffer support in state _4P_XFER_STATE_TX_LOCAL_DATA of sio_handle_mode_xfer()"
+//     #error "COMPILE FAIL: _4P_XFER_SZ TX data size larger than 1 byte not supported, to do that add tx buffer support in state _4P_XFER_STATE_TX_LOCAL_DATA_AND_RX of sio_handle_mode_xfer()"
 // #endif
 
 #define PLAYER_NUM_MIN 1u
@@ -84,7 +84,7 @@ enum {
     #define _4P_RESTART_PING_COUNT_RESET     0u
 
 
-// Ping mode atates
+// Ping mode states
     enum {                           // Given State N what reply byte should be loaded for the *NEXT* transfer?
         _4P_PING_STATE_WAIT_HEADER,
         _4P_PING_STATE_HEADER0,      // Load reply Ack1
@@ -95,27 +95,29 @@ enum {
 
 // Switching to Transmission(Xfer) mode states
     enum {
-        _4P_START_XFER_STATE_WAIT_HEADER,
+//        _4P_START_XFER_STATE_WAIT_HEADER,
         _4P_START_XFER_STATE_SENDING1, // Set once header is received, thereafter reply with 4 x _4P_REPLY_START_XFER_CMD (0xAA)
-        _4P_START_XFER_STATE_SENDING2, // Set once header is received, thereafter reply with 4 x _4P_REPLY_START_XFER_CMD (0xAA)
-        _4P_START_XFER_STATE_SENDING3, // Set once header is received, thereafter reply with 4 x _4P_REPLY_START_XFER_CMD (0xAA)
-        _4P_START_XFER_STATE_SENDING4, // Set once header is received, thereafter reply with 4 x _4P_REPLY_START_XFER_CMD (0xAA)
+        _4P_START_XFER_STATE_SENDING2,
+        _4P_START_XFER_STATE_SENDING3,
+        _4P_START_XFER_STATE_SENDING4,
+        _4P_START_XFER_STATE_DONE,
     };
 
 // Transmission(Xfer) modes
-// No sub-states for this mode, just synchronous RX and TX (where TX data will become available during the *NEXT* RX set)
+// Only substates in this mode are TX+RX (default) or align waiting to send the command to switch back to ping mode
     enum {
-        _4P_XFER_STATE_TX_LOCAL_DATA,  // TODO: During this stage are all RX Bytes 0?
-        _4P_XFER_STATE_TX_PADDING,     // TODO: During this stage are all RX Bytes 0?
-        _4P_XFER_STATE_RX_REMOTE_DATA, // TODO: During this stage should all tx bytes be 0?
+        _4P_XFER_STATE_TX_LOCAL_DATA_AND_RX,
+        _4P_XFER_STATE_WAIT_ALIGN_RESTART_PING_CMD
     };
 
 // Reset from Ping back to Transmission(Xfer) mode states
     enum {
-        _4P_RESTART_PING_STATE_SENDING1, // Set once header is received, thereafter reply with 4 x _4P_REPLY_START_XFER_CMD (0xAA)
-        _4P_RESTART_PING_STATE_SENDING2, // Set once header is received, thereafter reply with 4 x _4P_REPLY_START_XFER_CMD (0xAA)
-        _4P_RESTART_PING_STATE_SENDING3, // Set once header is received, thereafter reply with 4 x _4P_REPLY_START_XFER_CMD (0xAA)
-        _4P_RESTART_PING_STATE_SENDING4, // Set once header is received, thereafter reply with 4 x _4P_REPLY_START_XFER_CMD (0xAA)
+        // _4P_RESTART_PING_STATE_WAIT_ALIGN,
+        _4P_RESTART_PING_STATE_SENDING1,
+        _4P_RESTART_PING_STATE_SENDING2,
+        _4P_RESTART_PING_STATE_SENDING3,
+        _4P_RESTART_PING_STATE_SENDING4,
+        _4P_RESTART_PING_STATE_DONE,
     };
 
 
@@ -135,9 +137,8 @@ enum {
 void four_player_init(void);
 void four_player_enable(void);
 void four_player_disable(void);
-void four_player_log(void);
-void four_player_request_change_to_xfer_mode(void);
-void four_player_restart_ping_mode(void);
+bool four_player_request_change_to_xfer_mode(void);
+bool four_player_request_change_to_ping_mode(void);
 
 void four_player_set_xfer_data(uint8_t tx_byte);
 void four_player_claim_active_sio_buffer_for_main(void);  // TODO: May be better as a queue count instead of bool, in cases where there are 2x buffers ready and filled?

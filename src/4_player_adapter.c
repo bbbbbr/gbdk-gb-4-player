@@ -22,6 +22,8 @@
         - ACK1 should be loaded into SB_REG *after* receiving Header (0xFE)
           - so that it's received at the same time STATUS_1
             - and so on
+  - The **Last** Speed and Size values sent before the 0xAA switch to Transmission mode command
+    - determine what the speed and size will be in Transmission mode
 
   - Missing that all Players will receive 4 x 0xCC signal during Ping/Ping phase
     - when (usually) Player 1 sends 4 x 0xAA to initiate the switch from Ping -> Transmission
@@ -29,6 +31,9 @@
   - Any Player can send the 0xAA mode switch request, not just Player 1
     - Not certain, but 0xAA command may need to be aligned
       - such that the first 0xAA is in reply to the Ping header (0xFE)
+    - Sending 4 x 0xAA command should be aligned
+      - such that it starts being loaded as the next reply immediately after receiving the header packet
+        - which means they start being sent one byte after the header for four bytes
 
   - Missing that all other Players (usually 2-4) will receive 4 x 0xFF during Ping/Ping phase
     - when (usually) Player 1 sends 4 x 0xFF during Transmission mode to restart Ping mode
@@ -36,7 +41,11 @@
 
   - "It’s possible to restart the ping phase while operating in the transmission phase. To do so, the master Game Boy should send 4 or more bytes (FF FF FF FF, it’s possible fewer $FF bytes need to be sent, but this has not been extensively investigated yet). "
     - It appears sufficient to send as few as 3 x 0xFF to restart Ping mode
-      - Sometimes the 4 x 0xFF doesn't seem to work and needs another retry
+    - The 4 x 0xFF command to switch back to Ping mode appears to be more reliable and have less adverse affects
+      - when aligned as the first reply bytes to the start of a data packet
+        - if this isn't done it can result in a state where the adapter sends garbled data and an altered speed
+    - Switching back to Ping mode with 4 x 0xFF seems to always result in a larger gap between bytes (i.e. change in overall transmission rate)
+
 
   - Power is supplied to the adapter from the Player 1 port
     - Losing power on that port will cause a reset of the device
@@ -48,8 +57,6 @@
     - so when docs say "The protocol is simple: Each Game Boy sends a packet to the DMG-07 simultaneously"
       - They mean "WHEN the GB RXs a packet, it should reply with 
 
-  - Given some unknown conditions, starting Transmission(Xfer) mode can begin broadcasting random garbage data to all platers
-    - The Restart-ping and Start-Transmission modes have no effect when the adapter is in this state
 
   - The transmission rate is not continuous
     - There seems to be some kind of larger interval between groups of transmitted bytes
@@ -66,8 +73,6 @@
 
 // TODO: filter briefly unstable connection status values when link cable unplugged
 // TODO: filter out first (couple?) packet(s?) in xfer mode
-// TODO: implement loopback alignment check? (i.e.  know what last tx was, if next own rx doesn't match try skipping by +1 packet to re-align->repeat until working)
-// TODO: block start xfer mode when already in xfer mode , maybe throw error
 // TODO: deal with sio isr exiting at unsafe times and causing video glitches - benchmarking shows it's prob ok to burn a line here and there to exit at safe times
 // TODO: current method of claiming the sio buffer does not guarantee a complete buffer, needs to be "claim next buffer" which triggers on completion of a full xfer
 
@@ -76,6 +81,7 @@ uint8_t _4p_mode;                    // Current mode: [Ping] -> [Switching to Tr
 uint8_t _4p_mode_state;              // Sub-state within current mode
 uint8_t _4p_connect_status;          // 4-Player connection status
 uint8_t _4p_switchmode_cmd_rx_count; // Track whether 4 x 0xCC or 0xFF have been received in a row (signal commands for switching between Ping and Transmission(Xfer) modes)
+bool    _4p_request_switch_to_xfer_mode;
 
 // Transmission(Xfer) mode vars
 uint8_t _4P_xfer_tx_data;                      // Data to send in tx state
@@ -89,18 +95,18 @@ uint8_t sio_keepalive;               // Monitor SIO rx count to detect disconnec
 
 
 
-// == State change functions ==
-
+// =================== State change functions ===================
 
 
 // May be called either from Main code or ISR, so no critical section
 // (main caller expected to wrap it in critical)
 inline void four_player_reset_to_ping_no_critical(void) {
-        _4p_mode                    = _4P_STATE_PING;
-        _4p_connect_status          = _4P_CONNECT_NONE;
-        _4p_mode_state              = _4P_PING_STATE_WAIT_HEADER;
-        _4p_switchmode_cmd_rx_count = _4P_START_XFER_COUNT_RESET;
-        sio_keepalive               = SIO_KEEPALIVE_RESET;
+    _4p_mode                    = _4P_STATE_PING;
+    _4p_connect_status          = _4P_CONNECT_NONE;
+    _4p_mode_state              = _4P_PING_STATE_WAIT_HEADER;
+    _4p_switchmode_cmd_rx_count = _4P_START_XFER_COUNT_RESET;
+    sio_keepalive               = SIO_KEEPALIVE_RESET;
+    _4p_request_switch_to_xfer_mode = false;
 }
 
 
@@ -112,19 +118,33 @@ void four_player_init(void) {
 }
 
 
-void four_player_request_change_to_xfer_mode(void) {
+bool four_player_request_change_to_xfer_mode(void) {
+    uint8_t result = false;  // Default to failed
 
     CRITICAL {
-        _4p_mode       = _4P_STATE_START_XFER;
-        _4p_mode_state = _4P_START_XFER_STATE_WAIT_HEADER;
+        if (_4p_mode == _4P_STATE_PING) {
+            _4p_request_switch_to_xfer_mode = true;
+            result = true; // Signal success
+        }
     }
+
+    return result;
 }
 
 
-// Only called from ISR, no critical section
-void four_player_init_xfer_mode(void) {
+// Gets called within ISR to change modes once there is
+// the right alignment for sending the command
+static void four_player_begin_send_xfer_mode_cmd(void) {
+    _4p_mode       = _4P_STATE_START_XFER;
+    _4p_mode_state = _4P_START_XFER_STATE_SENDING1;
+    _4p_request_switch_to_xfer_mode = false;
+}
+
+
+// Gets called within ISR to change modes to Transmission(Xfer), no critical section
+static void four_player_init_xfer_mode(void) {
     _4p_mode                    = _4P_STATE_XFER;
-    _4p_mode_state              = _4P_XFER_STATE_TX_LOCAL_DATA; // TODO: no sub-state in this mode
+    _4p_mode_state              = _4P_XFER_STATE_TX_LOCAL_DATA_AND_RX;
     _4p_switchmode_cmd_rx_count = _4P_RESTART_PING_COUNT_RESET;
 
     _4p_xfer_count              = _4P_XFER_COUNT_RESET;
@@ -135,16 +155,42 @@ void four_player_init_xfer_mode(void) {
 }
 
 
-void four_player_restart_ping_mode(void) {
+// Called from Main, requires critical section
+// should only be called when in Transmission(Xfer) mode
+//
+// A result of true is "success", but that only means
+// the request was successfully submitted, not that the
+// mode changed- that needs to be monitored in _4p_mode
+bool four_player_request_change_to_ping_mode(void) {
+    uint8_t result = false;  // Default to failed
+
     CRITICAL {
-        _4p_mode       = _4P_STATE_RESTART_PING;
-        _4p_mode_state = _4P_RESTART_PING_STATE_SENDING1;
+        if (_4p_mode == _4P_STATE_XFER) {
+            // This is a sub-state of Transmission(Xfer) mode
+            // that tries to wait until the right packet alignment
+            // before sending the switch to Ping mode command
+            _4p_mode_state = _4P_XFER_STATE_WAIT_ALIGN_RESTART_PING_CMD;
+            result = true; // Signal success
+        }
     }
+
+    return result;
 }
 
 
+// Gets called within ISR to change modes once there is
+// the right alignment for sending the command
+static void four_player_begin_send_ping_mode_cmd(void) {
+        _4p_mode       = _4P_STATE_RESTART_PING;
+        _4p_mode_state = _4P_RESTART_PING_STATE_SENDING1;
+}
+
+
+// =================== Data interface functions ===================
+
+
 void four_player_set_xfer_data(uint8_t tx_byte) {
-    // Don't really need a critical section here since it's read-only from the ISR
+    // Don't need a critical section here since it's read-only from the ISR
     // CRITICAL {
         _4P_xfer_tx_data = tx_byte;
     // }
@@ -164,7 +210,7 @@ void four_player_claim_active_sio_buffer_for_main(void) {
 }
 
 
-// == Interrupt Functions ==
+// =================== Interrupt Functions ===================
 
 void four_player_vbl_isr(void) {
     if (sio_keepalive) {
@@ -185,7 +231,6 @@ static void sio_handle_mode_ping(uint8_t sio_byte) {
         SB_REG = _4P_REPLY_PING_ACK1;
     }
     else {
-        // TODO: Maybe move this to the main ISR body so it can be shared for all?
         // Monitor for 4 x 0xCC received in a row which means a switch to Transmission(Xfer) mode
         if (sio_byte == _4P_START_XFER_INDICATOR) {
             _4p_switchmode_cmd_rx_count++;
@@ -204,21 +249,29 @@ static void sio_handle_mode_ping(uint8_t sio_byte) {
         switch (_4p_mode_state) {
 
             case _4P_PING_STATE_STATUS1:
-                SB_REG = _4P_REPLY_PING_ACK2;   // _4P_REPLY_PING_SPEED;      // Pre-load Status2 reply (Speed)
-                _4p_connect_status = sio_byte;  // Save player connection data
+                SB_REG = _4P_REPLY_PING_ACK2;       // Pre-load Status2 reply (Ack2)
+                _4p_connect_status = sio_byte;      // Save player connection data
                 _4p_mode_state++;
                 break;
 
             case _4P_PING_STATE_STATUS2:
-                SB_REG = _4P_REPLY_PING_SPEED;  // _4P_REPLY_PING_PAKCET_SZ;  // Pre-load Status3 reply (Packet Size)
-                _4p_connect_status = sio_byte;  // Save player connection data
+                SB_REG = _4P_REPLY_PING_SPEED;      // Pre-load Status3 reply (SpeedPacket Size)
+                _4p_connect_status = sio_byte;      // Save player connection data
                 _4p_mode_state++;
                 break;
 
             case _4P_PING_STATE_STATUS3:
-                SB_REG = _4P_REPLY_PING_PAKCET_SZ; // _4P_REPLY_PING_ACK1;       // Pre-load Header reply (Ack1)
-                _4p_connect_status = sio_byte;     // Save player connection data
+                SB_REG = _4P_REPLY_PING_PAKCET_SZ;  // Pre-load Header reply (Packet Size)
+                _4p_connect_status = sio_byte;      // Save player connection data
                 _4p_mode_state = _4P_PING_HEADER;   // Packet should wrap around to header again
+
+                // When switching to Transmission(Xfer mode) the switch needs
+                // begin a complete transfer (here) so that the last speed and size
+                // data are accurate instead of random or other values. Takes
+                // effect on the *next* received sio byte
+                if (_4p_request_switch_to_xfer_mode) {
+                        four_player_begin_send_xfer_mode_cmd();
+                }
                 break;
 
             // Implied non-action: case _4P_PING_STATE_WAIT_HEADER -> load zero as TX placeholder
@@ -235,37 +288,17 @@ static void sio_handle_mode_ping(uint8_t sio_byte) {
 // the DMG-07 to switch over
 //
 // This should only be called while the hardware is in PING mode
-static void sio_handle_mode_start_xfer(uint8_t sio_byte) {
-    // Wait for Ping header to align start of command transmission (not sure this is required)
-    if (sio_byte == _4P_PING_HEADER) {
-        _4p_mode_state = _4P_START_XFER_STATE_SENDING1;
-        SB_REG = _4P_REPLY_START_XFER_CMD;
-    }
-    else if (_4p_mode_state != _4P_START_XFER_STATE_WAIT_HEADER) {
+static void sio_handle_mode_start_xfer(void) {
+    SB_REG = _4P_REPLY_START_XFER_CMD;
 
-        SB_REG = _4P_REPLY_START_XFER_CMD;
-
-        // Once the fourth byte has been sent the state should be change into Transmission
-        if (++_4p_mode_state == _4P_START_XFER_STATE_SENDING4) {            
-            // Don't immediately switch to xfer mode, wait for the signal (revert to Ping state in mean time)
-            // Revert to Ping state while waiting for ping to transmission mode signal
-            _4p_mode       = _4P_STATE_PING;
-            _4p_mode_state = _4P_PING_STATE_WAIT_HEADER;
-            _4p_switchmode_cmd_rx_count = _4P_START_XFER_COUNT_RESET;
-        }
-    }
-}
-
-
-// Try to revert to Ping mode from Transmission(Xfer) mode by sending 4 x 0xFF
-static void sio_handle_mode_restart_ping(void) {
-
-    // Send restart ping command bytes regardless of what is being received
-    SB_REG = _4P_REPLY_RESTART_PING_CMD;
-
-    // Once the fourth byte has been sent the state should be reset to Ping
-    if (++_4p_mode_state == _4P_RESTART_PING_STATE_SENDING4) {
-            four_player_reset_to_ping_no_critical();
+    // Once the fourth byte has been sent the state should be change into Transmission
+    _4p_mode_state++;
+    if (_4p_mode_state == _4P_START_XFER_STATE_DONE) {
+        // Don't immediately switch to xfer mode, wait for the signal (revert to Ping state in mean time)
+        // Revert to Ping state while waiting for ping to transmission mode signal
+        _4p_mode       = _4P_STATE_PING;
+        _4p_mode_state = _4P_PING_STATE_WAIT_HEADER;
+        _4p_switchmode_cmd_rx_count = _4P_START_XFER_COUNT_RESET;
     }
 }
 
@@ -285,7 +318,6 @@ static void sio_handle_mode_xfer(uint8_t sio_byte) {
     }
     else _4p_switchmode_cmd_rx_count = _4P_RESTART_PING_COUNT_RESET;
 
-
     // Load local data to send for next reply
     // During TX padding phase just send zeros (optional, but recommended)
     //
@@ -302,6 +334,28 @@ static void sio_handle_mode_xfer(uint8_t sio_byte) {
     if (_4p_xfer_count == _4P_XFER_RX_SZ) {
         _4p_xfer_count = _4P_XFER_COUNT_RESET;
         _4p_xfer_rx_buf_ready_for_main[_4p_xfer_rx_buf_sio_active] = true;
+
+        // Now ready if trying to switch back to ping mode which seems to
+        // work better when aligned to the start of the packet phase
+        // (this is end of packet, so *next* transfer is when the first
+        //  ping restart command gets loaded as the reply to the first packet byte)
+        if (_4p_mode_state == _4P_XFER_STATE_WAIT_ALIGN_RESTART_PING_CMD) {
+            Z();
+        }
+    }
+}
+
+
+// Try to revert to Ping mode from Transmission(Xfer) mode by sending 4 x 0xFF
+static void sio_handle_mode_restart_ping(void) {
+
+    // Send restart ping command bytes regardless of what is being received
+    SB_REG = _4P_REPLY_RESTART_PING_CMD;
+    _4p_mode_state++;
+
+    // Once the fourth byte has been sent the state should be reset to Ping
+    if (_4p_mode_state == _4P_RESTART_PING_STATE_DONE) {
+            four_player_reset_to_ping_no_critical();
     }
 }
 
@@ -317,13 +371,12 @@ void four_player_sio_isr(void) CRITICAL INTERRUPT {
     uint8_t sio_byte = SB_REG;
 
 
-    // More complex mode handlers first
     if (_4p_mode == _4P_STATE_PING)
         sio_handle_mode_ping(sio_byte);
+    else if (_4p_mode == _4P_STATE_START_XFER)
+        sio_handle_mode_start_xfer();
     else if (_4p_mode == _4P_STATE_XFER)
         sio_handle_mode_xfer(sio_byte);
-    else if (_4p_mode == _4P_STATE_START_XFER)
-        sio_handle_mode_start_xfer(sio_byte);
     else if (_4p_mode == _4P_STATE_RESTART_PING)
         sio_handle_mode_restart_ping();
 
@@ -334,9 +387,11 @@ void four_player_sio_isr(void) CRITICAL INTERRUPT {
         BGP_REG = ~BGP_REG;
     #endif
 }
-
 // Install direct interrupt handler
 ISR_VECTOR(VECTOR_SERIAL, four_player_sio_isr)
+
+
+// =================== General Enable/Disable Commands ===================
 
 
 void four_player_enable(void) {
@@ -363,12 +418,3 @@ void four_player_disable(void) {
     // Disable Serial RX
     SC_REG = SIOF_CLOCK_EXT;
 }
-
-
-uint16_t print_count = 0u;
-void four_player_log(void) {
-
-    gotoxy(1,1);
-    printf("%hx\n", _4p_connect_status);
-}
-

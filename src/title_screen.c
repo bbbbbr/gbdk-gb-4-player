@@ -110,13 +110,15 @@ static void start_data_mode(void) {
 
 
 static void restart_ping_mode(void) {
-    four_player_restart_ping_mode();
+    // TODO: do something with the result (bool) if it fails
+    four_player_request_change_to_ping_mode();
 }
 
 
 void title_screen_run(void){
 
-    bool title_screen_needs_redraw = false;
+    static bool next_ping_mode_redraw = true;
+    static bool next_xfer_mode_redraw = true;
     title_screen_init();
 
     while (1) {
@@ -124,16 +126,26 @@ void title_screen_run(void){
         vsync();
 
         if (GET_CURRENT_MODE() == _4P_STATE_PING) {
-            if (title_screen_needs_redraw == true) {
+            if (next_ping_mode_redraw == true) {
+                // Redraw the title screen
                 title_screen_init();
-                title_screen_needs_redraw = false;
+                next_ping_mode_redraw = false;
+                next_xfer_mode_redraw = true;
             }
             update_connection_display();
         }
         else if (GET_CURRENT_MODE() == _4P_STATE_XFER) {
+            if (next_xfer_mode_redraw == true) {
+                // Hide all sprites and cover title screen info
+                fill_bkg_rect(0,0,DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT, BLANK_TILE);
+                hide_sprites_range(0, MAX_HARDWARE_SPRITES);
+                next_ping_mode_redraw = true;
+                next_xfer_mode_redraw = false;
+            }
+
             // Load TX data for next frame first
-            four_player_set_xfer_data(keys & J_DPAD);  // TODO: lightweight checksum or etc on transmitted and received data
-            // four_player_set_xfer_data( 0x80u | WHICH_PLAYER_AM_I());
+            four_player_set_xfer_data(0x80u | (keys & J_DPAD));  // TODO: maybe lightweight checksum or etc on transmitted and received data
+            // four_player_set_xfer_data(0x80u | WHICH_PLAYER_AM_I());
 
             if (IS_PLAYER_DATA_READY()) {
                 handle_player_data();
@@ -144,23 +156,17 @@ void title_screen_run(void){
 
         if (KEY_TICKED(J_START)) {
             if (WHICH_PLAYER_AM_I() == PLAYER_1) {
-                if (GET_CURRENT_MODE() != _4P_STATE_XFER) {
-                    start_data_mode();
-                }
-            }
-        }
-        else if (KEY_TICKED(J_SELECT)) {
-            if (GET_CURRENT_MODE() != _4P_STATE_XFER) {
-                // Try to change mode even if this console isn't Player 1
-                // (allowed, but probably not recommended)
                 start_data_mode();
             }
         }
+        else if (KEY_TICKED(J_SELECT)) {
+            // Try to change mode even if this console isn't Player 1
+            // (allowed, but probably not recommended)
+            start_data_mode();
+        }
         else if (KEY_TICKED(J_B)) {
-            if (GET_CURRENT_MODE() != _4P_STATE_PING) {
-                // Try to restart Ping mode
-                restart_ping_mode();
-            }
+            // Try to restart Ping mode
+            restart_ping_mode();
         }
     }
 }
