@@ -96,43 +96,53 @@ uint8_t display_buf[DISPLAY_BUF_SZ];
 
 static void handle_player_data(void) {
 
-    four_player_claim_active_sio_buffer_for_main();
+    static uint8_t packets_ready;
+    // Read number of packets ready and cache it locally (it may change during processing)
+    packets_ready = four_player_rx_buf_get_num_packets_ready();
 
     static uint8_t c;
 
-    // Display hex readout for all players
-    uint8_t * p_display_buf = display_buf;
-    for (c = 0; c < _4P_XFER_RX_SZ; c++) {
+    for (uint8_t packet = 0; packet <= packets_ready; packet++) {
 
-        // Print hex bytes separated by spaces
-        uint8_t value = _4p_xfer_rx_buf[0][c];
-        *p_display_buf++ = (value >> 4) + BG_FONT_NUMS_TILES_START;
-        *p_display_buf++ = (value & 0x0F) + BG_FONT_NUMS_TILES_START;
-        *p_display_buf++ = BLANK_TILE;
-    }
-    set_bkg_tiles(0,0, DISPLAY_BUF_SZ, 1, display_buf);
+        // Display hex readout for all players
+        uint8_t * p_display_buf = display_buf;
+        for (c = 0; c < _4P_XFER_RX_SZ; c++) {
 
-    // Move a sprite for all players
-    uint8_t player_id_bit = _4P_PLAYER_1;
-
-    for (c = 0; c < _4P_XFER_RX_SZ; c++) {
-        if (IS_PLAYER_CONNECTED(player_id_bit)) {
-
-            uint8_t value = _4p_xfer_rx_buf[0][c];
-
-            int8_t x_mv = 0;
-            if      (value & J_LEFT)  x_mv = -1;
-            else if (value & J_RIGHT) x_mv = 1;
-
-            int8_t y_mv = 0;
-            if      (value & J_UP)   y_mv = -1;
-            else if (value & J_DOWN) y_mv = 1;
-
-            scroll_sprite(c, x_mv, y_mv);
+            // Print hex bytes separated by spaces
+            uint8_t value = _4p_rx_buf_READ_ptr[c];
+            *p_display_buf++ = (value >> 4) + BG_FONT_NUMS_TILES_START;
+            *p_display_buf++ = (value & 0x0F) + BG_FONT_NUMS_TILES_START;
+            *p_display_buf++ = BLANK_TILE;
         }
-        player_id_bit <<= 1;
+        set_bkg_tiles(0,0, DISPLAY_BUF_SZ, 1, display_buf);
+
+        // Move a sprite for all players
+        uint8_t player_id_bit = _4P_PLAYER_1;
+
+        for (c = 0; c < _4P_XFER_RX_SZ; c++) {
+            if (IS_PLAYER_CONNECTED(player_id_bit)) {
+
+                uint8_t value = _4p_rx_buf_READ_ptr[c];
+
+                int8_t x_mv = 0;
+                if      (value & J_LEFT)  x_mv = -1;
+                else if (value & J_RIGHT) x_mv = 1;
+
+                int8_t y_mv = 0;
+                if      (value & J_UP)   y_mv = -1;
+                else if (value & J_DOWN) y_mv = 1;
+
+                scroll_sprite(c, x_mv, y_mv);
+            }
+            player_id_bit <<= 1;
+        }
+
+        // Move to next packet RX Bytes                
+        _4p_rx_buf_packet_increment_read_ptr();
     }
 
+    // free up the rx buf space now that it's done being used
+    four_player_rx_buf_remove_n_packets(packets_ready);
 }
 
 

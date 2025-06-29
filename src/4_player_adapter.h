@@ -77,6 +77,11 @@ enum {
     #define _4P_XFER_COUNT_RESET             0u
     #define _4P_XFER_TX_PAD_VALUE            0x00u
 
+    // Buffer sizing for Transmission(Xfer) mode
+    #define RX_BUF_PACKET_SZ      (_4P_XFER_RX_SZ)   // Size in bytes of total RX transfer (i.e TX Size x 4 Players)
+    #define RX_BUF_NUM_PACKETS    3u                 // Tripple buffer for RX packets 
+    #define RX_BUF_SZ             (RX_BUF_PACKET_SZ * RX_BUF_NUM_PACKETS)
+
 // Restart Ping mode
     #define _4P_REPLY_RESTART_PING_CMD       0xFFu  // Sent x 4 by any Player to change from Transmission(Xfer) to Ping mode
     #define _4P_RESTART_PING_INDICATOR       0xFFu  // Received x 4 by *any* (non-sending?) Players indicating a change from Transmission(Xfer) back to Ping mode
@@ -141,17 +146,17 @@ bool four_player_request_change_to_xfer_mode(void);
 bool four_player_request_change_to_ping_mode(void);
 
 void four_player_set_xfer_data(uint8_t tx_byte);
-void four_player_claim_active_sio_buffer_for_main(void);  // TODO: May be better as a queue count instead of bool, in cases where there are 2x buffers ready and filled?
-
+uint8_t four_player_rx_buf_get_num_packets_ready(void);
+void four_player_rx_buf_remove_n_packets(uint8_t packet_count_to_remove);
 
 extern uint8_t _4p_mode;
 extern uint8_t _4p_connect_status;
 extern uint8_t _4P_xfer_tx_data;
-extern uint8_t _4p_xfer_rx_buf_sio_active;
-extern uint8_t _4p_xfer_rx_buf[2][_4P_XFER_RX_SZ];
-// extern uint8_t _4p_xfer_rx_buf[_4P_XFER_RX_SZ];
-// extern uint8_t _4p_xfer_rx_buf_alt[_4P_XFER_RX_SZ];
-extern bool    _4p_xfer_rx_buf_ready_for_main[2];
+
+extern uint8_t _4p_rx_buf[RX_BUF_SZ];
+extern uint8_t * _4p_rx_buf_READ_ptr;
+extern uint8_t   _4p_rx_buf_count;
+extern const uint8_t * _4p_rx_buf_end_wrap_addr;
 
 extern uint8_t packet_counter;
 extern uint8_t sio_counter;
@@ -159,9 +164,17 @@ extern uint8_t sio_counter;
 // PLAYER_ID_BIT should be one of _4P_PLAYER_1/2/3/4
 #define IS_PLAYER_CONNECTED(PLAYER_ID_BIT)  (_4p_connect_status & PLAYER_ID_BIT)
 #define WHICH_PLAYER_AM_I()                 (_4p_connect_status & _4P_PLAYER_ID_MASK)
-#define IS_PLAYER_DATA_READY()              (_4p_xfer_rx_buf_ready_for_main[_4p_xfer_rx_buf_sio_active] == true)
+#define IS_PLAYER_DATA_READY()              (four_player_rx_buf_get_num_packets_ready() != 0u)
 #define GET_CURRENT_MODE()                  (_4p_mode)
-// #define GET_INACTIVE_RX_BUF()               (!_4p_xfer_rx_buf_active)  // Use the OPPOSITE one that SIO is currently using
 
+// Due to how the buffer is set up and used, we can assume
+// the READ pointer won't overflow at any time during a single packet read,
+// and so can consolidate the buffer-end wraparound test and
+// count increment to the end of the packet.
+inline void _4p_rx_buf_packet_increment_read_ptr(void) {
+    _4p_rx_buf_READ_ptr += RX_BUF_PACKET_SZ;
+    if (_4p_rx_buf_READ_ptr == _4p_rx_buf_end_wrap_addr)
+        _4p_rx_buf_READ_ptr = _4p_rx_buf;
+}
 
 #endif // _4_PLAYER_ADATER_H
