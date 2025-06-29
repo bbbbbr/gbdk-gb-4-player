@@ -71,10 +71,12 @@
 
 // Implementation for using the OEM DMG-07 4-Player adapter
 
+// TODO: figure out why speed changes on -> revert to ping -> resume transmit, and esp when initiated by Player 1 vs other player
+
 // TODO: filter briefly unstable connection status values when link cable unplugged?
-// TODO: filter out first (couple?) packet(s?) in xfer mode
 // TODO: deal with sio isr exiting at unsafe times and causing video glitches - benchmarking shows it's prob ok to burn a line here and there to exit at safe times
 // TODO: instrument display of num dropped packets, how long processing is taking, etc
+// TODO: OPTIONAL: add a send queue
 
 
 uint8_t _4p_mode;                    // Current mode: [Ping] -> [Switching to Transmission(Xfer)] -> [Transmission(Xfer)]
@@ -163,9 +165,9 @@ static void four_player_init_xfer_mode(void) {
 
     _4p_xfer_count              = _4P_XFER_COUNT_RESET;
     // Buffer and control: Reset read and write pointers to base of buffer, zero count
-    _4p_rx_buf_WRITE_ptr   = _4p_rx_buf;
-    _4p_rx_buf_READ_ptr    = _4p_rx_buf;
-    _4p_rx_buf_count       = 0u;
+    _4p_rx_buf_WRITE_ptr        = _4p_rx_buf;
+    _4p_rx_buf_READ_ptr         = _4p_rx_buf;
+    _4p_rx_buf_count            = 0u;
 }
 
 
@@ -348,8 +350,12 @@ static void sio_handle_mode_xfer(uint8_t sio_byte) {
     // During TX padding phase just send zeros (optional, but recommended)
     //
     // For transfers larger than 1 byte, it would be: if (_4p_xfer_count <= _4P_XFER_TX_SZ) { SB_REG = <whatever data>; }
-    if (_4p_xfer_count == 0)
+    if (_4p_xfer_count == 0) {
         SB_REG = _4P_xfer_tx_data;
+         // Clear tx data now that it's transmitted to a specified value
+         // (in this case 0x00, meaning no data transmitted)
+        _4P_xfer_tx_data = _4P_XFER_CLEAR_TX_AFTER_TRANSMIT_VALUE;
+    }
     else
         SB_REG = _4P_XFER_TX_PAD_VALUE;
 

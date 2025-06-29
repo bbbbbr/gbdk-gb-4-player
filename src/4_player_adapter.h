@@ -76,6 +76,7 @@ enum {
     #define _4P_XFER_TX_PADDING_SZ           (_4P_XFER_RX_SZ - _4P_XFER_TX_SZ)  // Number of bytes to send during Send byte count set in Ping stage
     #define _4P_XFER_COUNT_RESET             0u
     #define _4P_XFER_TX_PAD_VALUE            0x00u
+    #define _4P_XFER_CLEAR_TX_AFTER_TRANSMIT_VALUE 0x00u
 
     // Buffer sizing for Transmission(Xfer) mode
     #define RX_BUF_PACKET_SZ      (_4P_XFER_RX_SZ)   // Size in bytes of total RX transfer (i.e TX Size x 4 Players)
