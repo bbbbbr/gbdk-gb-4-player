@@ -97,6 +97,11 @@ uint8_t display_buf[DISPLAY_BUF_SZ];
 static void handle_player_data(void) {
 
     static uint8_t packets_ready;
+
+    #ifdef DISPLAY_USE_SIO_DATA_DURATION_IN_BGP
+        BGP_REG = ~BGP_REG;
+    #endif
+
     // Read number of packets ready and cache it locally (it may change during processing)
     packets_ready = four_player_rx_buf_get_num_packets_ready();
 
@@ -143,6 +148,10 @@ static void handle_player_data(void) {
 
     // free up the rx buf space now that it's done being used
     four_player_rx_buf_remove_n_packets(packets_ready);
+
+    #ifdef DISPLAY_USE_SIO_DATA_DURATION_IN_BGP
+        BGP_REG = ~BGP_REG;
+    #endif
 }
 
 
