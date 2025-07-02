@@ -318,5 +318,12 @@ void title_screen_run(void){
             // Try to restart Ping mode
             restart_ping_mode();
         }
+
+        else if (KEY_TICKED(J_UP)) {
+            _4p_speed_increment();
+        }
+        else if (KEY_TICKED(J_DOWN)) {
+            _4p_speed_decrement();
+        }
     }
 }

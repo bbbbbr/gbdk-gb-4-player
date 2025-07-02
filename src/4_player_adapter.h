@@ -150,6 +150,9 @@ void four_player_set_xfer_data(uint8_t tx_byte);
 uint8_t four_player_rx_buf_get_num_packets_ready(void);
 void four_player_rx_buf_remove_n_packets(uint8_t packet_count_to_remove);
 
+void _4p_speed_increment(void);
+void _4p_speed_decrement(void);
+
 extern uint8_t _4p_mode;
 extern uint8_t _4p_connect_status;
 extern uint8_t _4P_xfer_tx_data;

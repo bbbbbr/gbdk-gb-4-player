@@ -66,6 +66,10 @@
     - Speed 0xFF -> 23 scanlines between RX bytes -> ((1000 ÷ 59.7) ÷ 254) × 23 = 1.57 msec
       - docs calc: msec per byte: (1000 / ((4194304 ÷ ((6 × 255) + 512)) ÷ 8)) = 3.895 msec
 
+  - With F1 race the SPEED setting seems to apply *INSTANTLY* in Ping mode
+    - On the first Ping reply it sets SPEED to 0x28
+      - Which changes the interval between Ping packets from 12.3ms to 20.2ms
+
 */
 
 
@@ -110,6 +114,8 @@ const uint8_t * _4p_rx_buf_end_wrap_addr = RX_BUF_PTR_END_WRAP_ADDR;            
 uint8_t sio_keepalive;               // Monitor SIO rx count to detect disconnects
 
 
+uint8_t _4p_speed;
+
 
 // =================== State change functions ===================
 
@@ -127,6 +133,8 @@ inline void four_player_reset_to_ping_no_critical(void) {
 
 
 void four_player_init(void) {
+
+    _4p_speed = _4P_REPLY_PING_SPEED;  // Load default speed
 
     CRITICAL {
         four_player_reset_to_ping_no_critical();
@@ -237,6 +245,18 @@ void four_player_rx_buf_remove_n_packets(uint8_t packet_count_to_remove) {
 }
 
 
+
+void _4p_speed_increment(void) {
+    if (_4p_speed < 255u)
+        _4p_speed++;
+}
+
+void _4p_speed_decrement(void) {
+    if (_4p_speed > 0)
+        _4p_speed--;
+}
+
+
 // =================== Interrupt Functions ===================
 
 void four_player_vbl_isr(void) {
@@ -283,7 +303,7 @@ static void sio_handle_mode_ping(uint8_t sio_byte) {
                 break;
 
             case _4P_PING_STATE_STATUS2:
-                SB_REG = _4P_REPLY_PING_SPEED;      // Pre-load Status3 reply (SpeedPacket Size)
+                SB_REG = _4p_speed; // _4P_REPLY_PING_SPEED;      // Pre-load Status3 reply (SpeedPacket Size)
                 _4p_connect_status = sio_byte;      // Save player connection data
                 _4p_mode_state++;
                 break;
