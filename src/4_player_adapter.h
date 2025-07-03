@@ -7,12 +7,101 @@
 #define SIO_KEEPALIVE_RESET   60u
 #define SIO_KEEPALIVE_TIMEOUT 0u
 
-#define _4P_XFER_SZ 1 // Use 1 Byte as total data size in Transmission(Xfer) mode
-// #define _4P_XFER_SZ  2 // 4
+// Console TX SIZE: controls how many bytes are sent from each console. 
+// - Min: 1 -> x 4 = 4  byte total Packer Size
+// - Max: 4 -> x 4 = 16 byte total Packet Size
+//
+// - Observation: Ping mode restart seems to malfunction down when testing
+//   with a SIZE of 5, so 4 may be the functional maximum
+//
+// TODO: OPTIONAL: make size runtime configurable
+#define _4P_XFER_SZ 1u // Use 1 Byte as total data size in Transmission(Xfer) mode
+// #define _4P_XFER_SZ   // 1u // 2u // 3u // 4u
 
 #if (_4P_XFER_SZ  > 1)
     #error "COMPILE FAIL: _4P_XFER_SZ TX data size larger than 1 byte not supported, to do that add multiple/buffer tx support sio_handle_mode_xfer()"
 #endif
+
+
+// == RATE value setting for Ping and Transmission(Xfer) intervals and timing ==
+//
+#define _4P_REPLY_PING_RATE_DEFAULT      0x10u
+//
+// - This setting is set in Ping Mode and applies immediately upon the next packet
+// - The value applied for Transmission(Xfer) mode will be from the last packet sent in Ping mode by Player 1
+// - It applies to Ping and Transmission(Xfer) modes, but affects them differently per below
+// 
+// == RATE in Ping Mode ==
+//
+//   - The RATE change applies __immediately__ upon next Ping packet
+//     - Value Range
+//       - Use Lower Nibble to: Set min possible packet time (i.e. delay between packets)
+//
+//       - Interval Between Packets      = (12.2 msec) + ((RATE & 0x0F) * 1 msec)
+//         - Range: 12.2 msec -> 27.21 msec
+//         - Min: 0x00 =  12.2 msec
+//         - Max: 0x0F = ~27.2 msec
+//         - WARNING! The value 0x00 is special and does nothing (no rate/timing change),
+//                    so for min Ping rate use a value of 0x10 to access the "0" setting
+//
+//    - These values are *fixed and do not change* in Ping mode
+//     - Interval After Each Packet Byte = 1.43 msec
+//     - Active Byte Transfer Time       = ~0.128 msec
+//       - S-CLK Clock Period            = ~15.95 usec (62.66khz)
+//
+//
+// == RATE in Transmission(Xfer) Mode ==
+//
+//   - For this mode RATE is set by the LAST value transmitted in Ping mode by Player 1
+//     - Value Range
+//       - Use Upper Nibble to: Set time between packet bytes
+//       - Use Lower Nibble to: Set min possible packet time (i.e. delay between packets)
+//       - WARNING! The value 0x00 is special and does nothing (no rate/timing change),
+//                  so consider either 0x01 or 0x10 to achieve "faster" settings
+//
+//       - Interval Between Packet Bytes = ((RATE >> 4) x .106 msec) + 0.887 msec
+//       - Total Packet Time =
+//         - Whichever of the following is larger:
+//           - Precalc Minimum           = ((RATE & 0x0F) x 1 msec) + 17 msec
+//              - Range: 17 msec -> 32 msec
+//              - Min: 0x00 = ~17 msec
+//              - Max: 0x0F = ~32 msec
+//           - Bytes Transfer Time       = (Byte Transfer Time[0.128 msec] + Interval Between Packet Bytes) x Byte Count) + (a value somewhere between .36 to 2.15 msec)
+//             - Not sure how the trailing add-on amount is determined
+//             - This scenario where Bytes Transfer Time exceeds the Precalc Minimum
+//               mostly shows up in 16 byte packet settings, or smaller packet sizes
+//               when the *Interval Between Packet Bytes* is at the largest setting.    
+//
+//    - These values are *fixed and do not change* in Transmission mode
+//     - Active Byte Transfer Time       = ~0.128 msec
+//       - S-CLK Clock Period            = ~15.95 usec (62.66khz)
+//
+//    - Some examples for Transmission Mode to illustrate:
+//
+//      - Shortest/Smallest possible packet
+//        - **This is a special case where RATE 0x10 x 4 Bytes is fastest transfer since RATE 0x00 is not available**
+//         - Packet Bytes:4, RATE=0x10 = Total Packet Time = ~17 msec
+//           - Interval Between Packet Bytes = ((0x10 >> 4) x .106 msec) + 0.887 msec = ~0.993 msec
+//           - Total Transfer time           = 17 msec (see below)
+//             - Precalc Minimum             = ((0x10 & 0x0F) x 1 msec) + 17 msec     = 17 msec   <-- Larger of the two, so this is the used value
+//             - Bytes Transfer Time         = (0.128 msec + 0.993 msec) x 4 bytes    = 4.48 msec <-- Smaller than Minimum, so **ignored**
+//
+//      - Another
+//         - Packet Bytes:4, RATE=0x01 = Total Packet Time = ~18 msec
+//           - Interval Between Packet Bytes = ((0x01 >> 4) x .106 msec) + 0.887 msec = ~0.887 msec
+//           - Total Transfer time           = 18 msec (see below)
+//             - Precalc Minimum             = ((0x01 & 0x0F) x 1 msec) + 17 msec     = 18 msec   <-- Larger of the two, so this is the used value
+//             - Bytes Transfer Time         = (0.128 msec + 0.887 msec) x 4 bytes    = 4.06 msec <-- Smaller than Minimum, so **ignored**
+//
+//      - Longest/Largest possible packet
+//         - Packet Bytes:16, RATE=0xFF = Total Packet Time = ~41.6 msec
+//           - Interval Between Packet Bytes = ((0xFF >> 4) x .106 msec) + 0.887 msec = ~2.477 msec
+//           - Total Transfer time           = ~41.6 msec (see below)
+//             - Precalc Minimum             = ((0xFF & 0x0F) x 1 msec) + 17 msec     = 32 msec    <-- Smaller of the two, so **ignored**
+//             - Bytes Transfer Time         = (0.128 msec + 2.477 msec) x 16 bytes   = 41.68 msec <-- Larger than Minimum, so this is the used value
+//
+//
+
 
 #define PLAYER_NUM_MIN 1u
 #define PLAYER_NUM_MAX 4u
@@ -50,19 +139,9 @@ enum {
 
 // Ping mode
     #define _4P_PING_HEADER           0xFEu
-
     #define _4P_REPLY_PING_ACK1       0x88u
     #define _4P_REPLY_PING_ACK2       0x88u
-    // SPEED:
-    // DMG-07 Bits-Per-Second --> 4194304 / ((6 * SPEED) + 512)
-    // Rough Bytes per frame: (((4194304 ÷ ((6 × SPEED) + 512)) ÷ 8) ÷ 59.7)
-    // Rough MSec per byte:   (1000 / ((4194304 ÷ ((6 × SPEED) + 512)) ÷ 8))
-    //
-    // 0x00 = Fastest, 0xFF = slowest
-
-    #define _4P_REPLY_PING_SPEED      0u  // 255u // ~256.7 bytes per second // 85u  // ~513 bytes per second // 0x00u // 1024 bytes per second
-    // SIZE sets the length of packets exchanged between all Game Boys. Nothing fancy, just the number of bytes in each packet. It probably shouldn’t be set to zero.
-    #define _4P_REPLY_PING_PAKCET_SZ (_4P_XFER_SZ) // Reply
+    #define _4P_REPLY_PING_PAKCET_SZ (_4P_XFER_SZ)
 
 // Start Transmission(Xfer) mode
     #define _4P_REPLY_START_XFER_CMD         0xAAu  // Sent x 4 by *any* Player to change from Ping to Transmission(Xfer) mode
@@ -86,7 +165,7 @@ enum {
 // Restart Ping mode
     #define _4P_REPLY_RESTART_PING_CMD       0xFFu  // Sent x 4 by any Player to change from Transmission(Xfer) to Ping mode
     #define _4P_RESTART_PING_INDICATOR       0xFFu  // Received x 4 by *any* (non-sending?) Players indicating a change from Transmission(Xfer) back to Ping mode
-    #define _4P_RESTART_PING_COUNT_DONE      4u     // How many consecutive 0xFF in a row triggers the switch from Ping to Transmission(Xfer) mode
+    #define _4P_RESTART_PING_COUNT_DONE      (_4P_XFER_RX_SZ)  // How many consecutive 0xFF in a row triggers the switch from Ping to Transmission(Xfer) mode
     #define _4P_RESTART_PING_COUNT_RESET     0u
 
 
@@ -149,6 +228,7 @@ bool four_player_request_change_to_ping_mode(void);
 void four_player_set_xfer_data(uint8_t tx_byte);
 uint8_t four_player_rx_buf_get_num_packets_ready(void);
 void four_player_rx_buf_remove_n_packets(uint8_t packet_count_to_remove);
+void _4p_set_rate(uint8_t speed);
 
 extern uint8_t _4p_mode;
 extern uint8_t _4p_connect_status;
