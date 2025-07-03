@@ -253,7 +253,13 @@ static void restart_ping_mode(void) {
 }
 
 
+#define TEST_DONE 0xFFu
+
 void title_screen_run(void){
+
+    uint8_t adapter_rate = 0x00u; //0x01u; // _4p_rate_12_2_msec   0x10  ...
+    uint8_t test_counter = 0u;
+    uint8_t test_dir = 1;
 
     static bool next_ping_mode_redraw = true;
     static bool next_xfer_mode_redraw = true;
@@ -262,6 +268,43 @@ void title_screen_run(void){
     while (1) {
         UPDATE_KEYS();
         vsync();
+
+        // Step through speed up to max and back down
+        // Units in console frames
+        if (test_counter != TEST_DONE)
+            test_counter++;
+
+        switch (test_counter) {
+            case 105u:
+                start_data_mode();
+                break;
+
+            case 120u:
+                restart_ping_mode();
+                break;
+
+            case 135u:
+                if (test_dir == 1) {
+                    if (adapter_rate < 255u)
+                        _4p_set_speed(++adapter_rate);
+                    else
+                        test_dir = ~test_dir;
+                } else {
+                    if (adapter_rate > 0x01u)
+                        _4p_set_speed(--adapter_rate);
+                    else {
+                        // End test loop after Up -> Down
+                        test_counter = TEST_DONE;
+                        // test_dir = ~test_dir;
+                    }
+                }
+                break;
+
+            case 150u:
+                test_counter = 100u;
+                break;
+        }
+
 
         if (GET_CURRENT_MODE() == _4P_STATE_PING) {
             if (next_ping_mode_redraw == true) {
@@ -298,7 +341,7 @@ void title_screen_run(void){
             }
 
             if (IS_PLAYER_DATA_READY()) {
-                handle_player_data();
+                // handle_player_data();
             }
         }
 
@@ -317,6 +360,14 @@ void title_screen_run(void){
         else if (KEY_TICKED(J_B)) {
             // Try to restart Ping mode
             restart_ping_mode();
+        }
+
+
+        else if (KEY_TICKED(J_UP)) {
+            if (adapter_rate < 255u) _4p_set_speed(++adapter_rate);
+        }
+        else if (KEY_TICKED(J_DOWN)) {
+            if (adapter_rate > 0x10u) _4p_set_speed(--adapter_rate);
         }
     }
 }
