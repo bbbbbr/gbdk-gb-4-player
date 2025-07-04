@@ -33,6 +33,47 @@
 #define RX_BUF_INITIAL_PACKET_IGNORE_COUNT   4   // Number of initial packets to ignore, works for TX size of 1. May need research for larger values
 uint8_t rx_packet_ignore_count;
 
+
+#define GAME_SPEED_START         1u
+#define PLAYER_X_HEAD_START_STEP (DEVICE_SCREEN_PX_WIDTH / (PLAYER_NUM_MAX + 1u))
+#define PLAYER_Y_HEAD_START      (DEVICE_SCREEN_PX_HEIGHT / 2u)
+
+#define PLAYER_DIR_NONE          (0u)
+#define PLAYER_DIR_UP            (J_UP)
+#define PLAYER_DIR_DOWN          (J_DOWN)
+#define PLAYER_DIR_LEFT          (J_LEFT)
+#define PLAYER_DIR_RIGHT         (J_RIGHT)
+
+// Check for 8 bit tile alignment before turning in N direction
+#define PLAYER_ALIGNED_DIR_CHANGE(pixel_coord) ((pixel_coord & 0x07u) == 0)
+
+uint8_t game_tick;
+uint8_t player_speed;
+uint8_t player_dir[PLAYER_NUM_MAX];
+uint8_t player_dir_next[PLAYER_NUM_MAX];
+
+uint8_t player_x_head[PLAYER_NUM_MAX];
+uint8_t player_y_head[PLAYER_NUM_MAX];
+
+// uint8_t player_x_tail[PLAYER_NUM_MAX];
+// uint8_t player_y_tail[PLAYER_NUM_MAX];
+
+
+static void game_vars_reset(void) {
+
+    game_tick    = 0;
+    player_speed = GAME_SPEED_START;
+
+    for (uint8_t c = 0; c < PLAYER_NUM_MAX; c++) {
+        player_dir[c]      = PLAYER_DIR_UP;
+        player_dir_next[c] = PLAYER_DIR_NONE;
+
+        player_x_head[c] = PLAYER_X_HEAD_START_STEP * (c + 1);
+        player_y_head[c] = PLAYER_Y_HEAD_START;
+    }
+}
+
+
 static void gameplay_init(void) {
 
     // // Load map and tiles
@@ -50,6 +91,8 @@ static void gameplay_init(void) {
     // Cover title screen info
     fill_bkg_rect(0,0,DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT, BLANK_TILE);
 
+    game_vars_reset();
+
     // Set up player sprites
     uint8_t my_player_num = WHICH_PLAYER_AM_I();
     uint8_t player_id_bit = _4P_PLAYER_1;
@@ -61,9 +104,7 @@ static void gameplay_init(void) {
             uint8_t tile_id = (my_player_num == (c + 1)) ? SPR_SNAKE_TILE_YOUR_PLYR_HEAD : SPR_SNAKE_TILE_OTHER_PLYR_HEAD;
             set_sprite_tile(c, tile_id);
 
-            uint8_t xinit = (c + 1) * (DEVICE_SCREEN_PX_WIDTH  / (PLAYER_NUM_MAX + 1));
-            uint8_t yinit =     (DEVICE_SCREEN_PX_HEIGHT / 2u);
-            move_sprite(c, xinit, yinit);
+            move_sprite(c, player_x_head[c], player_y_head[c]);
         }
         else hide_sprite(c);
 
@@ -75,42 +116,67 @@ static void gameplay_init(void) {
 }
 
 
-#define DISPLAY_BUF_SZ (_4P_XFER_RX_SZ * 3)
-uint8_t display_buf[DISPLAY_BUF_SZ];
-
-static void display_player_data(void) {
-
+static void packet_process_player_data(void) {
     static uint8_t c;
 
-    // Display hex readout for all players
-    uint8_t * p_display_buf = display_buf;
-    for (c = 0; c < _4P_XFER_RX_SZ; c++) {
+    // One game tick per 4 Player data packet
+    game_tick++;
 
-        // Print hex bytes separated by spaces
-        uint8_t value = _4p_rx_buf_READ_ptr[c];
-        *p_display_buf++ = (value >> 4) + BG_FONT_NUMS_TILES_START;
-        *p_display_buf++ = (value & 0x0F) + BG_FONT_NUMS_TILES_START;
-        *p_display_buf++ = BLANK_TILE;
-    }
-    set_bkg_tiles(0,0, DISPLAY_BUF_SZ, 1, display_buf);
-
-    // Move a sprite for all players
     uint8_t player_id_bit = _4P_PLAYER_1;
 
     for (c = 0; c < _4P_XFER_RX_SZ; c++) {
         if (IS_PLAYER_CONNECTED(player_id_bit)) {
 
+            // Check for player commands
             uint8_t value = _4p_rx_buf_READ_ptr[c];
+            if ((value & _SIO_CMD_MASK) == _SIO_CMD_DPAD) {
 
-            int8_t x_mv = 0;
-            if      (value & J_LEFT)  x_mv = -1;
-            else if (value & J_RIGHT) x_mv = 1;
+                uint8_t dir_request = value & _SIO_DATA_MASK;
+                if (dir_request) player_dir_next[c] = dir_request;
+            }
 
-            int8_t y_mv = 0;
-            if      (value & J_UP)    y_mv = -1;
-            else if (value & J_DOWN)  y_mv = 1;
+            // TODO: could also cache player_dir[] -> dir
+            // Cached copy to remove duplicate array lookup
+            uint8_t dir_next = player_dir_next[c];
 
-            scroll_sprite(c, x_mv, y_mv);            
+            // If tile aligned on X or Y then do check for direction change
+            if (dir_next) {
+
+// TODO: block change of dir to opposite of current dir
+// dir_next != dir_reverse[ player_dir[c] ]
+// const dir_reverse[] = {PLAYER_DIR_DOWN, 
+// - Maybe dir from bits to 0-3? (could be X = even, Y = odd)
+
+// TODO: Lock initial X/Y positions to tile alignment
+
+                // Y changes must be applied on a X tile alignment
+                if  PLAYER_ALIGNED_DIR_CHANGE(player_x_head[c]) {
+                    // Apply dir change if requested and zero out request
+                    if (dir_next & (PLAYER_DIR_UP | PLAYER_DIR_DOWN)) {
+                        player_dir[c]      = dir_next;
+                        player_dir_next[c] = PLAYER_DIR_NONE;
+                    }
+                }
+                // X changes must be applied on a Y tile alignment
+                if  PLAYER_ALIGNED_DIR_CHANGE(player_y_head[c]) {
+                    // Apply dir change if requested and zero out request
+                    if (dir_next & (PLAYER_DIR_LEFT | PLAYER_DIR_RIGHT)) {
+                        player_dir[c]      = dir_next;
+                        player_dir_next[c] = PLAYER_DIR_NONE;
+                    }
+                }
+            }
+
+            // Apply movement
+            if ((game_tick & 0x03u) == 0u) {
+                switch (player_dir[c]) {
+                    case PLAYER_DIR_UP:    player_y_head[c] -= player_speed; break;
+                    case PLAYER_DIR_DOWN:  player_y_head[c] += player_speed; break;
+                    case PLAYER_DIR_LEFT:  player_x_head[c] -= player_speed; break;
+                    case PLAYER_DIR_RIGHT: player_x_head[c] += player_speed; break;
+                }
+                move_sprite(c, player_x_head[c], player_y_head[c]);
+            }
         }
         player_id_bit <<= 1;
     }
@@ -132,7 +198,7 @@ static void handle_player_data(void) {
         if (rx_packet_ignore_count)
             rx_packet_ignore_count--;
         else
-            display_player_data();
+            packet_process_player_data();
 
         // Move to next packet RX Bytes                
         _4p_rx_buf_packet_increment_read_ptr();

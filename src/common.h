@@ -7,7 +7,7 @@
 #define ARRAY_LEN(A)  sizeof(A) / sizeof(A[0])
 
 #define DISPLAY_SIO_ISR_DURATION_IN_BGP
-// #define DISPLAY_USE_SIO_DATA_DURATION_IN_BGP
+#define DISPLAY_USE_SIO_DATA_DURATION_IN_BGP
 
 #define ENABLE_SIO_KEEPALIVE
 
@@ -16,7 +16,10 @@
 #define AUDTERM_ALL_RIGHT (AUDTERM_4_RIGHT | AUDTERM_3_RIGHT | AUDTERM_2_RIGHT | AUDTERM_1_RIGHT)
 
 // SIO/Serial commands (Upper Nibble bits only)
-#define _SIO_CMD_DPAD 0x80
+#define _SIO_CMD_MASK  0xF0u
+#define _SIO_DATA_MASK 0x0Fu
+
+#define _SIO_CMD_DPAD  0x80u
 
 
 #endif // _COMMON_H
