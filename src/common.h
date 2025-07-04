@@ -15,10 +15,9 @@
 #define AUDTERM_ALL_LEFT  (AUDTERM_4_LEFT | AUDTERM_3_LEFT | AUDTERM_2_LEFT | AUDTERM_1_LEFT)
 #define AUDTERM_ALL_RIGHT (AUDTERM_4_RIGHT | AUDTERM_3_RIGHT | AUDTERM_2_RIGHT | AUDTERM_1_RIGHT)
 
+// SIO/Serial commands (Upper Nibble bits only)
+#define _SIO_CMD_DPAD 0x80
 
-typedef enum mainstates {
-    STATE_PLACEHOLDER = 0
-};
 
 #endif // _COMMON_H
 

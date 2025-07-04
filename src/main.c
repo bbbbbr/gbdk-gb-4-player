@@ -8,11 +8,10 @@
 #include "4_player_adapter.h"
 
 #include "title_screen.h"
-
+#include "gameplay.h"
 
 
 static void main_init(void) {
-
 
     HIDE_BKG;
     HIDE_SPRITES;
@@ -39,5 +38,6 @@ void main(void){
 
     while (1) {
         title_screen_run();
+        gameplay_run();
     }
 }
