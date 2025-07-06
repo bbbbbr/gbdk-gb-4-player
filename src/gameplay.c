@@ -76,7 +76,7 @@ void gameplay_run(void){
 
     while (1) {
         UPDATE_KEYS();
-        vsync_or_sio_4P_packet_data_ready();
+        wait_vsync_or_sio_4P_packet_data_ready();
 
         if (IS_PLAYER_DATA_READY()) {
             process_packets();
@@ -99,3 +99,67 @@ void gameplay_run(void){
         }
     }
 }
+
+
+#ifdef DEBUG_LOCAL_SINGLE_PLAYER_ONLY
+
+    extern       uint8_t _4P_xfer_tx_data;
+    extern const uint8_t * _4p_rx_buf_end_wrap_addr;
+    extern uint8_t * _4p_rx_buf_WRITE_ptr;
+    extern uint8_t * _4p_rx_buf_READ_ptr;
+
+    void _4p_mock_init_xfer_buffers(void) {
+        // Buffer and control: Reset read and write pointers to base of buffer, zero count
+        _4p_rx_buf_WRITE_ptr        = _4p_rx_buf;
+        _4p_rx_buf_READ_ptr         = _4p_rx_buf;
+        _4p_rx_buf_count            = 0u;
+    }
+
+
+    void _4p_mock_packet(void) {
+
+        if (_4p_rx_buf_count != RX_BUF_SZ) {
+
+            *_4p_rx_buf_WRITE_ptr++ = _4P_xfer_tx_data;
+            *_4p_rx_buf_WRITE_ptr++ = 0x00u;
+            *_4p_rx_buf_WRITE_ptr++ = 0x00u;
+            *_4p_rx_buf_WRITE_ptr++ = 0x00u;
+
+            _4p_rx_buf_count += RX_BUF_PACKET_SZ;
+
+            // Handle wraparound
+            if (_4p_rx_buf_WRITE_ptr == _4p_rx_buf_end_wrap_addr)
+                _4p_rx_buf_WRITE_ptr = _4p_rx_buf;
+        }
+    }
+
+
+    void gameplay_run_local_only(void){
+
+        // Debug, set only local player present
+        _4p_connect_status = _4P_PLAYER_1;
+        gameplay_init();
+        _4p_mock_init_xfer_buffers();
+
+        while (1) {
+            UPDATE_KEYS();
+            vsync();
+
+            if (IS_PLAYER_DATA_READY()) {
+                process_packets();
+            }
+
+            // Load D-Pad TX data for next frame
+            // Only send data when there is a discrete event
+
+            uint8_t dpad_ticked = GET_KEYS_TICKED(J_DPAD);
+            if (dpad_ticked != 0u) {
+                four_player_set_xfer_data(_SIO_CMD_DPAD | dpad_ticked);
+            }
+            // four_player_set_xfer_data(keys);
+
+            // Mock a packet, one per frame
+            _4p_mock_packet();
+        }
+    }
+#endif

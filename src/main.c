@@ -37,7 +37,13 @@ void main(void){
     four_player_enable();
 
     while (1) {
-        title_screen_run();
-        gameplay_run();
+        #ifdef DEBUG_LOCAL_SINGLE_PLAYER_ONLY
+            title_screen_init();
+            gameplay_run_local_only();
+        #else
+            title_screen_run();
+            gameplay_run();
+        #endif
     }
 }
+

@@ -23,7 +23,7 @@ const uint8_t you_spr_x[] = {
 };
 
 
-static void title_screen_init(void) {
+void title_screen_init(void) {
 
     // Load map and tiles
     set_bkg_data(BG_TITLE_BG_TILES_START, title_bg_TILE_COUNT, title_bg_tiles);

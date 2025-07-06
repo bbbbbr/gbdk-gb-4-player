@@ -22,7 +22,7 @@ void vsync_or_sio_4P_mode_change(void) {
 // Wait in HALT until vblank ISRs done or a 4 Player packet is ready
 //
 // NOTE: To wake up more often than VBlank this expects the serial ISR to be running
-void vsync_or_sio_4P_packet_data_ready(void) {
+void wait_vsync_or_sio_4P_packet_data_ready(void) {
 
     const uint8_t start_systime = *((uint8_t *)&sys_time);
 

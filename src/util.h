@@ -4,6 +4,6 @@
 #include "common.h"
 
 void vsync_or_sio_4P_mode_change(void);
-void vsync_or_sio_4P_packet_data_ready(void);
+void wait_vsync_or_sio_4P_packet_data_ready(void);
 
 #endif
