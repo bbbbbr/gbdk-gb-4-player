@@ -13,7 +13,7 @@
 #include "snakes.h"
 
 uint8_t game_tick;
-uint8_t player_speed;
+uint8_t game_tick_speed;
 uint8_t player_dir[PLAYER_NUM_MAX];
 uint8_t player_dir_next[PLAYER_NUM_MAX];
 
@@ -23,8 +23,23 @@ uint8_t player_y_head[PLAYER_NUM_MAX];
 uint8_t player_x_tail[PLAYER_NUM_MAX];
 uint8_t player_y_tail[PLAYER_NUM_MAX];
 
-
 uint8_t game_board[BOARD_WIDTH][BOARD_HEIGHT];
+
+// TODO: change for individual bits for directions so this and other things can be more compact
+// Lookup to prevent snake from turning back on top of itself
+const uint8_t dir_opposite[16u] = {
+    PLAYER_DIR_NONE,
+    PLAYER_DIR_LEFT,  // 0x01  J_RIGHT
+    PLAYER_DIR_RIGHT, // 0x02  J_LEFT
+    PLAYER_DIR_NONE,  // 0x03
+
+    PLAYER_DIR_DOWN,  // 0x04  J_UP
+    PLAYER_DIR_NONE,  // 0x05
+    PLAYER_DIR_NONE,  // 0x06
+    PLAYER_DIR_NONE,  // 0x07
+
+    PLAYER_DIR_UP,    // 0x08  J_DOWN
+};
 
 
 static void player_head_increment(uint8_t move_dir, uint8_t player_id);
@@ -34,8 +49,8 @@ static void player_tail_increment(uint8_t move_dir, uint8_t player_id);
 
 void snakes_reset(void) {
 
-    game_tick    = 0;
-    player_speed = GAME_SPEED_START;
+    game_tick       = 0;
+    game_tick_speed = GAME_TICK_SPEED_START;
 
     for (uint8_t c = 0; c < PLAYER_NUM_MAX; c++) {
         player_dir[c]      = PLAYER_DIR_UP;
@@ -65,11 +80,12 @@ void snakes_redraw_all(void) {
         if (IS_PLAYER_CONNECTED(player_id_bit)) {
             // Use different sprite tile for this player vs others
             uint8_t tile_id = (my_player_num == (c + 1)) ? SPR_SNAKE_TILE_YOUR_PLYR_HEAD : SPR_SNAKE_TILE_OTHER_PLYR_HEAD;
-            set_sprite_tile(c, tile_id);
 
-            move_sprite(c, player_x_head[c], player_y_head[c]);
+            set_bkg_tile_xy(player_x_head[c] * TILE_WH, player_y_head[c], tile_id);
+            // set_sprite_tile(c, tile_id);
+            // move_sprite(c, player_x_head[c] * TILE_WH, player_y_head[c] * TILE_WH);
         }
-        else hide_sprite(c);
+        // else hide_sprite(c);
 
         player_id_bit <<= 1;
     }
@@ -77,7 +93,6 @@ void snakes_redraw_all(void) {
 }
 
 /*
-
 static uint8_t snake_head_increment(uint8_t move_dir, uint8_t player_id) {
 
     // Current head position
@@ -124,8 +139,8 @@ static uint8_t snake_head_increment(uint8_t move_dir, uint8_t player_id) {
             return HEAD_INC_OK; // Success, no collision
     }
 }
-
-
+*/
+/*
 static void player_tail_increment(uint8_t move_dir, uint8_t player_id) {
 
     // Current tail position
@@ -191,57 +206,38 @@ void snakes_process_packet_input_and_tick_game(void) {
             // D-Pad input type command
             if ((value & _SIO_CMD_MASK) == _SIO_CMD_DPAD) {
                 // Save D-Pad button press for when the snake is next able to turn
+                // Block snake turning back onto itself
                 uint8_t dir_request = value & _SIO_DATA_MASK;
-                if (dir_request) player_dir_next[c] = dir_request;
+                if (dir_request && (player_dir[c] != dir_opposite[dir_request]))
+                    player_dir_next[c] = dir_request;
             }
+            
+            // // All direction changes must only be applied when on an exact tile alignment
+            // if (PLAYER_ALIGNED_DIR_CHANGE(player_x_head[c], player_y_head[c])) {
 
-            // Cached copy to remove duplicate array lookup
-            uint8_t dir_next = player_dir_next[c];
+                // Apply movement
+                if ((game_tick & 0x0Fu) == 0u) {  // TODO: more granular movement, make a counter that resets and counts down
 
-            // If tile aligned on X or Y then check for direction change
-            if (dir_next) {
-
-                        // TODO: block change of dir to opposite of current dir
-                        // dir_next != dir_reverse[ player_dir[c] ]
-                        // const dir_reverse[] = {PLAYER_DIR_DOWN, 
-                        // - Maybe dir from bits to 0-3? (could be X = even, Y = odd)
-
-                        // TODO: Lock initial X/Y positions to tile alignment
-
-                // Y changes must be applied on a X tile alignment
-                if  PLAYER_ALIGNED_DIR_CHANGE(player_x_head[c]) {
-                    // Apply dir change if requested and zero out request
-                    if (dir_next & (PLAYER_DIR_UP | PLAYER_DIR_DOWN)) {
-                        player_dir[c]      = dir_next;
+                    // Check for direction change request
+                    if (player_dir_next[c]) {
+                        player_dir[c]      = player_dir_next[c];
                         player_dir_next[c] = PLAYER_DIR_NONE;
                     }
-                }
-                // X changes must be applied on a Y tile alignment
-                if  PLAYER_ALIGNED_DIR_CHANGE(player_y_head[c]) {
-                    // Apply dir change if requested and zero out request
-                    if (dir_next & (PLAYER_DIR_LEFT | PLAYER_DIR_RIGHT)) {
-                        player_dir[c]      = dir_next;
-                        player_dir_next[c] = PLAYER_DIR_NONE;
-                    }
-                }
-            }
 
-                            // if (player_head_increment(...) == COLL) {
-                            //     player_tail_increment(...);
-                            // } else {
-                            //     // Player collided, do something... end game?
-                            // }
+                    // set_bkg_tile_xy(player_x_head[c], player_y_head[c], BLANK_TILE);
+                    set_bkg_tile_xy(player_x_head[c], player_y_head[c], SPR_SNAKE_TILE_YOUR_PLYR_BODY);
 
-            // Apply movement
-            if ((game_tick & 0x03u) == 0u) {
-                switch (player_dir[c]) {
-                    case PLAYER_DIR_UP:    player_y_head[c] -= player_speed; break;
-                    case PLAYER_DIR_DOWN:  player_y_head[c] += player_speed; break;
-                    case PLAYER_DIR_LEFT:  player_x_head[c] -= player_speed; break;
-                    case PLAYER_DIR_RIGHT: player_x_head[c] += player_speed; break;
+                    switch (player_dir[c]) {
+                        case PLAYER_DIR_UP:    player_y_head[c] --; break;
+                        case PLAYER_DIR_DOWN:  player_y_head[c] ++; break;
+                        case PLAYER_DIR_LEFT:  player_x_head[c] --; break;
+                        case PLAYER_DIR_RIGHT: player_x_head[c] ++; break;
+                    }                  
+
+                    // Draw a tile at existing location
+                    set_bkg_tile_xy(player_x_head[c], player_y_head[c], SPR_SNAKE_TILE_YOUR_PLYR_HEAD);
                 }
-                move_sprite(c, player_x_head[c], player_y_head[c]);
-            }
+            // }
         }
         player_id_bit <<= 1;
     }

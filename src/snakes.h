@@ -4,9 +4,12 @@
 
 #define TILE_WH                  8u  // Tile Width and Height in pixels
 
-#define GAME_SPEED_START         1u
-#define PLAYER_X_HEAD_START_STEP ((DEVICE_SCREEN_WIDTH / (PLAYER_NUM_MAX + 1u)) * TILE_WH)
-#define PLAYER_Y_HEAD_START      ((DEVICE_SCREEN_HEIGHT / 2u) * TILE_WH)
+#define GAME_TICK_SPEED_START         1u
+
+// #define PLAYER_GAME_TICK_SPEED_START         1u
+
+#define PLAYER_X_HEAD_START_STEP ((DEVICE_SCREEN_WIDTH / (PLAYER_NUM_MAX + 1u))) // * TILE_WH)
+#define PLAYER_Y_HEAD_START      ((DEVICE_SCREEN_HEIGHT / 2u)) // * TILE_WH)
 
 #define PLAYER_DIR_NONE          (0u)
 #define PLAYER_DIR_UP            (J_UP)
@@ -15,7 +18,9 @@
 #define PLAYER_DIR_RIGHT         (J_RIGHT)
 
 // Check for 8 bit tile alignment before turning in N direction
-#define PLAYER_ALIGNED_DIR_CHANGE(pixel_coord) ((pixel_coord & 0x07u) == 0)
+// #define PLAYER_ALIGNED_DIR_CHANGE(pixel_coord) ((pixel_coord & 0x07u) == 0)
+
+#define PLAYER_ALIGNED_DIR_CHANGE(x,y) (((x | y) & 0x07u) == 0)
 
 
 #define BOARD_WIDTH         (DEVICE_SCREEN_WIDTH)
