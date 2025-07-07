@@ -207,6 +207,9 @@ enum {
 
 
 // Player connectivity bits
+// Bit packing for player connection byte broadcasted by hardware (stored in _4p_connect_status) is:
+// .7 .. .4 = Player connection status bits, one bit per player
+// .3 .. .0 = "Your" player number, range 1-4
 #define _4P_PLAYER_ID_MASK 0x07u
 #define _4P_CONNECT_NONE   0u
 #define _4P_PLAYER_1   (1u << 4)
@@ -245,6 +248,7 @@ extern uint8_t sio_counter;
 // PLAYER_ID_BIT should be one of _4P_PLAYER_1/2/3/4
 #define IS_PLAYER_CONNECTED(PLAYER_ID_BIT)  (_4p_connect_status & PLAYER_ID_BIT)
 #define WHICH_PLAYER_AM_I()                 (_4p_connect_status & _4P_PLAYER_ID_MASK)
+#define WHICH_PLAYER_AM_I_ZERO_BASED()      ((_4p_connect_status & _4P_PLAYER_ID_MASK) - 1u)
 #define IS_PLAYER_DATA_READY()              (four_player_rx_buf_get_num_packets_ready() != 0u)
 #define GET_CURRENT_MODE()                  (_4p_mode)
 

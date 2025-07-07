@@ -34,7 +34,8 @@ void title_screen_init(void) {
     set_bkg_data((uint8_t)BG_FONT_NUMS_TILES_START, font_nums_TILE_COUNT, font_nums_tiles);
 
     set_sprite_data(SPR_YOU_ARROW_SPR_TILES_START, you_arrow_spr_TILE_COUNT, you_arrow_spr_tiles);
-    set_sprite_data(SPR_SNAKE_TILES_START, snake_tiles_spr_TILE_COUNT, snake_tiles_spr_tiles);
+
+    set_sprite_data(SNAKE_TILES_START, snake_tiles_TILE_COUNT, snake_tiles_tiles);
     hide_sprites_range(0, MAX_HARDWARE_SPRITES);
 }
 

@@ -29,6 +29,8 @@
 #define BOARD_Y_MAX         (BOARD_HEIGHT - 1u)
 #define BOARD_X_MIN         (0u)
 #define BOARD_Y_MIN         (0u)
+#define BOARD_X_WRAP_MIN    ((uint8_t)-1)
+#define BOARD_Y_WRAP_MIN    ((uint8_t)-1)
 
 // Bits stored per board/tile entry
 // 7..4 : direction
@@ -36,7 +38,7 @@
 // 2    : snake food
 // 1..0 : player number
 
-#define BOARD_CLEAR         0x00u
+#define BOARD_CLEAR          0x00u
 #define BOARD_TAIL_DIR_BITS  0xF0u
 #define BOARD_COLLISION_BIT  0x08u
 #define BOARD_FOOD_BIT       0x04u
