@@ -8,7 +8,9 @@
 #include "font_nums.h"
 
 #include "you_arrow_spr.h"
+
 #include "snake_tiles.h"
+#include "board_tiles.h"
 
 #define BG_TITLE_BG_TILES_START      0u
 #define BG_CHECKBOX_TILES_START      (BG_TITLE_BG_TILES_START + title_bg_TILE_COUNT)
@@ -59,6 +61,9 @@
     #define TILE_LEFT_DOWN  1u
     #define TILE_RIGHT_UP   2u
     #define TILE_RIGHT_DOWN 3u
+
+#define BOARD_TILES_START       (SNAKE_TILES_START + (uint8_t)snake_tiles_TILE_COUNT)
+    #define BOARD_TILE_HEART    (BOARD_TILES_START + 0u)
 
 #endif // _GFX_H
 

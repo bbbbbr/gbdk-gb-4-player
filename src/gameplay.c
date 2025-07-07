@@ -161,7 +161,7 @@ void gameplay_run(void){
             if (IS_PLAYER_DATA_READY()) {
                 if (process_packets() == false) {
                     // Handle Game Over
-                }
+                }                
             }
 
             // Load D-Pad TX data for next frame
@@ -170,6 +170,10 @@ void gameplay_run(void){
             uint8_t dpad_ticked = GET_KEYS_TICKED(J_DPAD);
             if (dpad_ticked != 0u) {
                 four_player_set_xfer_data(_SIO_CMD_DPAD | dpad_ticked);
+            } 
+            else {
+                // clear tx data, this would normally be done in the serial ISR as it transmitted
+                _4P_xfer_tx_data = 0x00;
             }
             // four_player_set_xfer_data(keys);
 

@@ -6,6 +6,8 @@
 
 #define ARRAY_LEN(A)  sizeof(A) / sizeof(A[0])
 
+#define FAST_RAND_MODULO_8(range_size)   ( (uint8_t) ( ((uint16_t)rand() * range_size) >> 8 ))
+
 
 #define DISPLAY_SIO_ISR_DURATION_IN_BGP
 #define DISPLAY_USE_SIO_DATA_DURATION_IN_BGP

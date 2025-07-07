@@ -1,4 +1,5 @@
 #include <gbdk/platform.h>
+#include <rand.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -32,6 +33,14 @@ snake_t snakes[PLAYER_NUM_MAX];
 
 // Laid out as Rows, so: (y * BOARD_WIDTH) + x -> BOARD_INDEX(x,y)
 uint8_t game_board[BOARD_WIDTH * BOARD_HEIGHT];
+const uint8_t * p_board_end = game_board + BOARD_INDEX(BOARD_WIDTH, BOARD_HEIGHT);
+
+uint16_t food_spawn_timer;
+uint8_t  food_currently_spawned_count;
+uint8_t  food_eaten_total;
+uint8_t  rand_seed_1;
+bool     rand_initialized;
+
 
 // TODO: change for individual bits for directions so this and other things can be more compact
 // Lookup to prevent snake from turning back on top of itself
@@ -91,10 +100,85 @@ const uint8_t snake_tile_body_horiz_lut[] = {
 static void player_head_increment(uint8_t move_dir, uint8_t player_id);
 static void player_tail_increment(uint8_t move_dir, uint8_t player_id);
 
+static uint8_t snake_calc_tile_head(uint8_t p_num);
+static uint8_t snake_calc_tile_tail(uint8_t p_num, uint8_t dir);
+static uint8_t snake_calc_tile_body(uint8_t p_num);
+
+static void snake_board_reset(void);
+
+static uint8_t snake_head_increment(uint8_t p_num);
+static void snake_tail_increment(uint8_t p_num);
 
 
+static void rand_and_food_reset(void) {
+    // TODO: food_spawned_min -> allow spawning more than 1 food at a time, and increase it over time? (by getting "+" spawns that maybe are timed to vanish)
+    food_eaten_total             = 0u;
+    food_currently_spawned_count = FOOD_SPAWNED_NONE;
+    food_spawn_timer   = FOOD_SPAWN_TIMER_MIN;
+    rand_seed_1        = 0u;
+    rand_initialized   = false;
+}
 
-uint8_t snake_calc_tile_head(uint8_t p_num) {
+
+// Rand init gets triggered based on broadcasted user input and game_tick
+// which both run in exact parallel, so rand result should be identical
+// for all snakes
+static void rand_update_seed(void) {
+
+    if (rand_seed_1 == 0u)
+        rand_seed_1 = game_tick;
+    else {
+        rand_initialized = true;
+        initrand( (uint16_t)rand_seed_1 << 8 | (uint16_t)game_tick);
+    }
+ }
+
+
+static void food_spawn_single_in_center(void) {
+
+    food_currently_spawned_count++;
+    game_board[ BOARD_INDEX(BOARD_WIDTH / 2, BOARD_HEIGHT / 2) ] = BOARD_FOOD_BIT;
+    set_bkg_tile_xy(BOARD_WIDTH / 2, BOARD_HEIGHT / 2, BOARD_TILE_HEART);
+}
+
+
+static void food_spawn_new(void) {
+    // TODO: Food eaten counter with "Win" threshold so this doesn't have to deal with an extremely cluttered board what would make this inefficient and possibly unbeatable
+
+    food_currently_spawned_count++;
+
+    // Start with one food pellet in the middle
+    // Upshift by 1 to increase range
+    food_spawn_timer = ((uint16_t)FAST_RAND_MODULO_8(FOOD_SPAWN_TIMER_RANGE) << 1)+ FOOD_SPAWN_TIMER_MIN;
+    
+    uint8_t spawn_x = FAST_RAND_MODULO_8(BOARD_WIDTH);
+    uint8_t spawn_y = FAST_RAND_MODULO_8(BOARD_HEIGHT);
+
+    uint8_t * p_board = game_board + BOARD_INDEX(spawn_x, spawn_y);
+    while( *p_board != BLANK_TILE) {
+        // Wrap around to the start if the end is reached
+        p_board++;
+        if (p_board == p_board_end)
+            p_board = game_board;
+
+        // Update x position and wrap if needed
+        spawn_x++;
+        if (spawn_x == BOARD_WIDTH) {
+            spawn_x = BOARD_X_MIN;
+
+            spawn_y++;
+            if (spawn_y == BOARD_HEIGHT) {
+                spawn_y = BOARD_Y_MIN;
+            }
+        }
+    }
+
+    *p_board = BOARD_FOOD_BIT;
+    set_bkg_tile_xy(spawn_x, spawn_y, BOARD_TILE_HEART);
+ }
+
+
+static uint8_t snake_calc_tile_head(uint8_t p_num) {
 
     // Draw tile for player
     // Use different tile for this player vs others
@@ -105,7 +189,7 @@ uint8_t snake_calc_tile_head(uint8_t p_num) {
 }
 
 
-uint8_t snake_calc_tile_tail(uint8_t p_num, uint8_t dir) {
+static uint8_t snake_calc_tile_tail(uint8_t p_num, uint8_t dir) {
 
     // Draw tile for player
     // Use different tile for this player vs others
@@ -116,7 +200,7 @@ uint8_t snake_calc_tile_tail(uint8_t p_num, uint8_t dir) {
 }
 
 
-uint8_t snake_calc_tile_body(uint8_t p_num) {
+static uint8_t snake_calc_tile_body(uint8_t p_num) {
 
     // Draw body segment at current location (straight or corner) based on movement
     // dir into current tile (dir_prev[]) and movement dir into next tile (dir[])
@@ -132,7 +216,7 @@ uint8_t snake_calc_tile_body(uint8_t p_num) {
 }
 
 
-void snakes_board_reset(void) {
+static void snake_board_reset(void) {
 
     uint8_t * p_board = game_board;
 
@@ -141,6 +225,10 @@ void snakes_board_reset(void) {
             *p_board++  = BOARD_CLEAR;
         }
     }
+
+    // Start with one food pellet in the middle
+    rand_and_food_reset();
+    food_spawn_single_in_center();
 }
 
 
@@ -150,7 +238,7 @@ void snakes_reset_and_draw(void) {
     game_tick_speed       = GAME_TICK_SPEED_START;
     uint8_t player_id_bit = _4P_PLAYER_1;
 
-    snakes_board_reset();
+    snake_board_reset();
 
     for (uint8_t c = 0u; c < PLAYER_NUM_MAX; c++) {
         if (IS_PLAYER_CONNECTED(player_id_bit)) {
@@ -186,43 +274,7 @@ void snakes_reset_and_draw(void) {
 }
 
 
-/*
-void snakes_redraw_all(void) {
-    // Set up player sprites
-    uint8_t my_player_num = WHICH_PLAYER_AM_I_ZERO_BASED();
-    uint8_t player_id_bit = _4P_PLAYER_1;
-
-    for (uint8_t c = 0; c < PLAYER_NUM_MAX; c++) {
-
-        if (IS_PLAYER_CONNECTED(player_id_bit)) {
-
-            uint8_t head_x = snakes[c].head_x;
-            uint8_t head_y = snakes[c].head_y;
-
-            // Draw tile for player
-            // Use different tile for this player vs others
-            uint8_t tile_id = snake_tile_head_lut[ snakes[c].dir ];
-            if (my_player_num =! c) tile_id += TILE_OTHERS_OFFSET;
-
-            set_bkg_tile_xy(head_x, head_y, tile_id);
-
-            // Record data to board
-            uint8_t board_player_data = PLAYER_BITS_TO_BOARD(c);
-            uint8_t * p_board = game_board + BOARD_INDEX(head_x, head_y);
-            for (uint8_t row = 0; row < PLAYER_X_LEN_START; row++) {
-                *p_board = board_player_data;
-                p_board += BOARD_WIDTH;
-            }
-
-
-        }
-        player_id_bit <<= 1;
-    }
-}
-*/
-
-
-uint8_t snake_head_increment(uint8_t p_num) {
+static uint8_t snake_head_increment(uint8_t p_num) {
 
     uint8_t head_x;
     uint8_t head_y;
@@ -358,6 +410,9 @@ bool snakes_process_packet_input_and_tick_game(void) {
 
             // D-Pad input type command
             if ((value & _SIO_CMD_MASK) == _SIO_CMD_DPAD) {
+
+                if (!rand_initialized) rand_update_seed();
+
                 // Save D-Pad button press for when the snake is next able to turn
                 // Block snake turning back onto itself
                 uint8_t dir_request = value & _SIO_DATA_MASK;
@@ -379,10 +434,16 @@ bool snakes_process_packet_input_and_tick_game(void) {
 
                 uint8_t try_move = snake_head_increment(c);
                 if (try_move == HEAD_INC_COLLIDED) {
+                    // Could do tail shrink and point loss when snakes collide
                     return false;   // Game over
                 }
                 else if (try_move == HEAD_INC_GROW_SNAKE) {
                     // Ate food, in order to grow the snake don't increment the tail
+                    if (food_currently_spawned_count) food_currently_spawned_count--;
+
+                    // TODO: maybe if food is skull snake shrinks and loses total food eaten?                    
+                    // TODO: implement/display total food eaten as score/etc
+                    food_eaten_total++;
                 }
                 else {
                     snake_tail_increment(c);
@@ -390,6 +451,14 @@ bool snakes_process_packet_input_and_tick_game(void) {
             }
         }
         player_id_bit <<= 1;
+    }
+
+    // Only spawn food when there is none
+    if (food_currently_spawned_count == FOOD_SPAWNED_NONE) {
+        if (food_spawn_timer == FOOD_TIMER_COUNT_DONE) {
+            if (rand_initialized) food_spawn_new();
+        }
+        else food_spawn_timer--;
     }
 
     return true;
