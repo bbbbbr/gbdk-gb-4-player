@@ -33,14 +33,14 @@ static void gameplay_init(void) {
     // Cover title screen info
     fill_bkg_rect(0,0,DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT, BLANK_TILE);
 
-    snakes_reset();
-    snakes_redraw_all();
+    snakes_reset_and_draw();
+    hide_sprites_range(0, MAX_HARDWARE_SPRITES);
 
     rx_packet_ignore_count = RX_BUF_INITIAL_PACKET_IGNORE_COUNT;
 }
 
 
-static void process_packets(void) {
+static bool process_packets(void) {
 
     #ifdef DISPLAY_USE_SIO_DATA_DURATION_IN_BGP
         BGP_REG = ~BGP_REG;
@@ -54,8 +54,14 @@ static void process_packets(void) {
         // Skip initial packets if requested
         if (rx_packet_ignore_count)
             rx_packet_ignore_count--;
-        else
-            snakes_process_packet_input_and_tick_game();
+        else {
+            if (snakes_process_packet_input_and_tick_game() == false) {
+                #ifdef DISPLAY_USE_SIO_DATA_DURATION_IN_BGP
+                    BGP_REG = ~BGP_REG;
+                #endif
+                return false;
+            }
+        }
 
         // Move to next packet RX Bytes                
         _4p_rx_buf_packet_increment_read_ptr();
@@ -67,6 +73,8 @@ static void process_packets(void) {
     #ifdef DISPLAY_USE_SIO_DATA_DURATION_IN_BGP
         BGP_REG = ~BGP_REG;
     #endif
+
+    return true;
 }
 
 
@@ -79,7 +87,9 @@ void gameplay_run(void){
         wait_vsync_or_sio_4P_packet_data_ready();
 
         if (IS_PLAYER_DATA_READY()) {
-            process_packets();
+            if (process_packets() == false) {
+                // Handle Game Over
+            }
         }
 
         // Exit title screen once mode is switched to PING
@@ -137,7 +147,10 @@ void gameplay_run(void){
     void gameplay_run_local_only(void){
 
         // Debug, set only local player present
-        _4p_connect_status = _4P_PLAYER_1 | PLAYER_1;
+        // _4p_connect_status = _4P_PLAYER_1 | PLAYER_1;
+        // _4p_connect_status = (_4P_PLAYER_1 | _4P_PLAYER_3) | PLAYER_1;
+        _4p_connect_status = (_4P_PLAYER_1 | _4P_PLAYER_2 | _4P_PLAYER_3 | _4P_PLAYER_4) | PLAYER_1;
+
         gameplay_init();
         _4p_mock_init_xfer_buffers();
 
@@ -146,7 +159,9 @@ void gameplay_run(void){
             vsync();
 
             if (IS_PLAYER_DATA_READY()) {
-                process_packets();
+                if (process_packets() == false) {
+                    // Handle Game Over
+                }
             }
 
             // Load D-Pad TX data for next frame

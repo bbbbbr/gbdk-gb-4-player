@@ -12,19 +12,26 @@
 
 #include "snakes.h"
 
+
 uint8_t game_tick;
 uint8_t game_tick_speed;
-uint8_t player_dir[PLAYER_NUM_MAX];
-uint8_t player_dir_next[PLAYER_NUM_MAX];
-uint8_t player_dir_prev[PLAYER_NUM_MAX];
 
-uint8_t player_x_head[PLAYER_NUM_MAX];
-uint8_t player_y_head[PLAYER_NUM_MAX];
+typedef struct {
+    uint8_t dir;
+    uint8_t dir_next;
+    uint8_t dir_prev;
 
-uint8_t player_x_tail[PLAYER_NUM_MAX];
-uint8_t player_y_tail[PLAYER_NUM_MAX];
+    uint8_t head_x;
+    uint8_t head_y;
 
-uint8_t game_board[BOARD_WIDTH][BOARD_HEIGHT];
+    uint8_t tail_x;
+    uint8_t tail_y;
+} snake_t;
+
+snake_t snakes[PLAYER_NUM_MAX];
+
+// Laid out as Rows, so: (y * BOARD_WIDTH) + x -> BOARD_INDEX(x,y)
+uint8_t game_board[BOARD_WIDTH * BOARD_HEIGHT];
 
 // TODO: change for individual bits for directions so this and other things can be more compact
 // Lookup to prevent snake from turning back on top of itself
@@ -47,6 +54,13 @@ const uint8_t snake_tile_head_lut[] = {
     [J_LEFT]  = SNAKE_TILE_YOURS_HEAD + TILE_LEFT,
     [J_UP]    = SNAKE_TILE_YOURS_HEAD + TILE_UP,
     [J_DOWN]  = SNAKE_TILE_YOURS_HEAD + TILE_DOWN,
+};
+
+const uint8_t snake_tile_tail_lut[] = {
+    [J_RIGHT] = SNAKE_TILE_YOURS_TAIL + TILE_RIGHT,
+    [J_LEFT]  = SNAKE_TILE_YOURS_TAIL + TILE_LEFT,
+    [J_UP]    = SNAKE_TILE_YOURS_TAIL + TILE_UP,
+    [J_DOWN]  = SNAKE_TILE_YOURS_TAIL + TILE_DOWN,
 };
 
 const uint8_t snake_tile_body_vert_lut[] = {
@@ -79,38 +93,100 @@ static void player_tail_increment(uint8_t move_dir, uint8_t player_id);
 
 
 
+
+uint8_t snake_calc_tile_head(uint8_t p_num) {
+
+    // Draw tile for player
+    // Use different tile for this player vs others
+    uint8_t tile_id = snake_tile_head_lut[ snakes[p_num].dir ];
+    if (WHICH_PLAYER_AM_I_ZERO_BASED() != p_num) tile_id += TILE_OTHERS_OFFSET;
+
+    return tile_id;
+}
+
+
+uint8_t snake_calc_tile_tail(uint8_t p_num, uint8_t dir) {
+
+    // Draw tile for player
+    // Use different tile for this player vs others
+    uint8_t tile_id = snake_tile_tail_lut[ dir ];
+    if (WHICH_PLAYER_AM_I_ZERO_BASED() != p_num) tile_id += TILE_OTHERS_OFFSET;
+
+    return tile_id;
+}
+
+
+uint8_t snake_calc_tile_body(uint8_t p_num) {
+
+    // Draw body segment at current location (straight or corner) based on movement
+    // dir into current tile (dir_prev[]) and movement dir into next tile (dir[])
+    uint8_t tile_id;
+    if (snakes[p_num].dir_prev & (PLAYER_DIR_LEFT | PLAYER_DIR_RIGHT))
+        tile_id = snake_tile_body_horiz_lut[ snakes[p_num].dir_prev | snakes[p_num].dir ];
+    else
+        tile_id = snake_tile_body_vert_lut[ snakes[p_num].dir_prev | snakes[p_num].dir ];
+
+    if (WHICH_PLAYER_AM_I_ZERO_BASED() != p_num) tile_id += TILE_OTHERS_OFFSET;
+
+    return tile_id;
+}
+
+
 void snakes_board_reset(void) {
+
+    uint8_t * p_board = game_board;
 
     for (uint8_t y = 0; y < BOARD_HEIGHT; y++) {
         for (uint8_t x = 0; x < BOARD_WIDTH; x++) {                        
-            game_board[x][y] = BOARD_CLEAR;
+            *p_board++  = BOARD_CLEAR;
         }
     }
 }
 
 
-void snakes_reset(void) {
+void snakes_reset_and_draw(void) {
 
-    game_tick       = 0u;
-    game_tick_speed = GAME_TICK_SPEED_START;
+    game_tick             = 0u;
+    game_tick_speed       = GAME_TICK_SPEED_START;
+    uint8_t player_id_bit = _4P_PLAYER_1;
 
     snakes_board_reset();
 
     for (uint8_t c = 0u; c < PLAYER_NUM_MAX; c++) {
-        player_dir[c]      = PLAYER_DIR_UP;
-        player_dir_next[c] = PLAYER_DIR_UP;
-        player_dir_next[c] = PLAYER_DIR_NONE;
+        if (IS_PLAYER_CONNECTED(player_id_bit)) {
 
-        player_x_head[c] = PLAYER_X_HEAD_START_STEP * (c + 1u);
-        player_y_head[c] = PLAYER_Y_HEAD_START;
+            snakes[c].dir      = PLAYER_DIR_UP;
+            snakes[c].dir_next = PLAYER_DIR_UP;
+            snakes[c].dir_next = PLAYER_DIR_NONE;
 
-        // TODO: tail
-        // player_x_tail[c] = PLAYER_X_HEAD_START_STEP * (c + 1u);
-        // player_y_tail[c] = PLAYER_Y_HEAD_START + 1u;
+            // Have to set up and record the snake head/body/tail on the board before drawing
+            uint8_t head_x = snakes[c].head_x = PLAYER_X_HEAD_START_STEP * (c + 1u);
+            uint8_t head_y = snakes[c].head_y = PLAYER_Y_HEAD_START;
+
+            // Record data to board
+            uint8_t board_player_data = PLAYER_BITS_TO_BOARD(c);
+            uint8_t * p_board = game_board + BOARD_INDEX(head_x, head_y );
+
+            for (uint8_t row = 0; row < PLAYER_LEN_START; row++) {
+                *p_board = board_player_data;
+                p_board += BOARD_WIDTH;
+            }
+
+            // Snake starts off 3 tiles long (head, body, tail)
+            snakes[c].tail_x = PLAYER_X_HEAD_START_STEP * (c + 1u);
+            snakes[c].tail_y = PLAYER_Y_HEAD_START + (PLAYER_LEN_START - 1u);
+
+            // Now draw them
+            set_bkg_tile_xy(head_x, head_y,      snake_calc_tile_head(c));
+            set_bkg_tile_xy(head_x, head_y + 1, snake_calc_tile_body(c));
+            set_bkg_tile_xy(head_x, head_y + 2, snake_calc_tile_tail(c, snakes[c].dir));
+        }
+        player_id_bit <<= 1;        
     }    
 }
 
 
+/*
 void snakes_redraw_all(void) {
     // Set up player sprites
     uint8_t my_player_num = WHICH_PLAYER_AM_I_ZERO_BASED();
@@ -120,119 +196,132 @@ void snakes_redraw_all(void) {
 
         if (IS_PLAYER_CONNECTED(player_id_bit)) {
 
-            uint8_t head_x = player_x_head[c];
-            uint8_t head_y = player_y_head[c];
+            uint8_t head_x = snakes[c].head_x;
+            uint8_t head_y = snakes[c].head_y;
 
             // Draw tile for player
             // Use different tile for this player vs others
-            uint8_t tile_id = snake_tile_head_lut[ player_dir[c] ];
+            uint8_t tile_id = snake_tile_head_lut[ snakes[c].dir ];
             if (my_player_num =! c) tile_id += TILE_OTHERS_OFFSET;
 
             set_bkg_tile_xy(head_x, head_y, tile_id);
 
             // Record data to board
-            uint8_t board_player_data = TAIL_BITS_TO_BOARD(player_dir[c]) | (c & BOARD_PLAYER_BITS); // TODO make a macro out of this
-            game_board[head_x][head_y] = board_player_data;
+            uint8_t board_player_data = PLAYER_BITS_TO_BOARD(c);
+            uint8_t * p_board = game_board + BOARD_INDEX(head_x, head_y);
+            for (uint8_t row = 0; row < PLAYER_X_LEN_START; row++) {
+                *p_board = board_player_data;
+                p_board += BOARD_WIDTH;
+            }
+
 
         }
         player_id_bit <<= 1;
     }
-    hide_sprites_range(PLAYER_NUM_MAX, MAX_HARDWARE_SPRITES);
 }
+*/
 
-/*
-static uint8_t snake_head_increment(uint8_t player_num, bool is_your_player) {
 
-    // Current head position
-    uint8_t move_dir = player_dir[player_num];
-    int8_t head_x = player_x_head[player_num];
-    int8_t head_y = player_y_head[player_num];
+uint8_t snake_head_increment(uint8_t p_num) {
+
+    uint8_t head_x;
+    uint8_t head_y;
+    uint8_t old_head_x = head_x = snakes[p_num].head_x;
+    uint8_t old_head_y = head_y = snakes[p_num].head_y;
 
     // Store final move_dir in current position
     // (which will soon become previous position)    
-    uint8_t board_player_data = TAIL_BITS_TO_BOARD(move_dir) | (player_num & BOARD_PLAYER_BITS); // TODO make a macro out of this
-    game_board[head_x][head_y] = board_player_data;
+    uint8_t board_player_data = snakes[p_num].dir | p_num; // TODO make a macro out of this
+    game_board[ BOARD_INDEX(head_x, head_y) ] = PLAYER_BITS_TO_BOARD(p_num);
 
-    switch (move_dir) {
-        case PLAYER_DIR_UP:    head_y--; break;
-        case PLAYER_DIR_DOWN:  head_y++; break;
-        case PLAYER_DIR_LEFT:  head_x--; break;
-        case PLAYER_DIR_RIGHT: head_x++; break;
+    // Increment tail and handle wraparound
+    switch (snakes[p_num].dir) {
+        case PLAYER_DIR_UP:    head_y--;
+                               if (head_y == BOARD_Y_WRAP_MIN) head_y = BOARD_Y_MAX;
+                               break;
+        case PLAYER_DIR_DOWN:  head_y++;
+                               if (head_y > BOARD_Y_MAX) head_y = BOARD_Y_MIN;
+                               break;
+        case PLAYER_DIR_LEFT:  head_x--;
+                               if (head_x == BOARD_X_WRAP_MIN) head_x = BOARD_X_MAX;
+                               break;
+        case PLAYER_DIR_RIGHT: head_x++;
+                               if (head_x > BOARD_X_MAX) head_x = BOARD_X_MIN;
+                               break;
     }                  
 
-    // // Calc new X,Y for head
-    // int8_t new_x = head_x + dir_x[move_dir];
-    // int8_t new_y = head_y + dir_y[move_dir];
 
-    // Handle screen edge wraparound
-         if (head_x > BOARD_X_MAX) head_x = 0;
-    else if (head_x < 0)          head_x = BOARD_X_MAX;
+    // Check for collision at new location, otherwise check for snake food or empty
+    uint8_t * p_board_new = game_board + BOARD_INDEX(head_x, head_y);
+    uint8_t   board_data_new = *p_board_new;
 
-         if (head_y > BOARD_Y_MAX) head_y = 0;
-    else if (head_y < 0)          head_y = BOARD_Y_MAX;
+    // No collision
+    if ((board_data_new & BOARD_EXCEPT_FOOD_MASK) == BOARD_CLEAR) {
 
-    // Check for collision, otherwise check for snake food or empty
-    uint8_t board_data_new = game_board[head_x][head_y];
-
-    // if (board_data_new & BOARD_COLLISION_BIT) {
-    //     // Failure, do NOT update head to new position
-    //     return HEAD_INC_COLLIDED;
-    // }
-    // else
-     {
         // Set new location with player and preliminary dir bits
-        game_board[head_x][head_y] = board_player_data;
+        *p_board_new = board_player_data;
 
-        // Draw head tile at new location
-        uint8_t head_tile_id = snake_tile_head_lut[ player_dir[player_num] ];
-        if (is_your_player) head_tile_id += TILE_OTHERS_OFFSET;
+        uint8_t body_tile_id = snake_calc_tile_body(p_num);
+        uint8_t head_tile_id = snake_calc_tile_head(p_num);
 
-        set_bkg_tile_xy(player_x_head[player_num], player_y_head[player_num], head_tile_id);
+        // Update the tiles
+        set_bkg_tile_xy(head_x, head_y, head_tile_id);
+        set_bkg_tile_xy(old_head_x, old_head_y, body_tile_id);
 
-        // Save new head position
-        player_x_tail[player_num] = head_x;
-        player_y_tail[player_num] = head_y;
+        snakes[p_num].head_x = head_x;
+        snakes[p_num].head_y = head_y;
 
         if (board_data_new & BOARD_FOOD_BIT)
             return HEAD_INC_GROW_SNAKE; // Success, and grow snake (i.e. don't increment tail)
         else
             return HEAD_INC_OK; // Success, no collision
+    } else {
+        // Failure, do NOT update head to new position
+        return HEAD_INC_COLLIDED;
     }
 }
-*/
 
-/*
-static void player_tail_increment(uint8_t move_dir, uint8_t player_id) {
+
+static void snake_tail_increment(uint8_t p_num) {
 
     // Current tail position
-    int8_t tail_x = player_x_tail[player_id];
-    int8_t tail_y = player_y_tail[player_id];
+    uint8_t tail_x;
+    uint8_t tail_y;
+    uint8_t old_tail_x = tail_x = snakes[p_num].tail_x;
+    uint8_t old_tail_y = tail_y = snakes[p_num].tail_y;
 
     // Read and cache current tail position data
-    uint8_t tail_cur_data = game_board[tail_x][tail_y];
+    uint8_t * p_board = game_board + BOARD_INDEX(tail_x, tail_y);
+    uint8_t board_tail_data = *p_board;
 
     // Clear board at current (soon to be former) tail position
-    game_board[tail_x][tail_y] = BOARD_CLEAR;
-    set_bkg_tile_xy(new_x, new_y, BLANK_TILE);
+    *p_board = BOARD_CLEAR;
 
-    // Calc new X,Y for tail
-    int8_t new_x = tail_x + dir_x[move_dir];
-    int8_t new_y = tail_y + dir_y[move_dir];
-
-    // Handle screen edge wraparound
-         if (new_x > BOARD_X_MAX) new_x = 0u;
-    else if (new_x < 0u)          new_x = BOARD_X_MAX;
-
-         if (new_y > BOARD_Y_MAX) new_y = 0u;
-    else if (new_y < 0u)          new_y = BOARD_Y_MAX;
+    // Retrieve dir of tail from board
+    // Increment tail and handle wraparound
+    switch ( DIR_BITS_FROM_BOARD(board_tail_data) ) {
+        case PLAYER_DIR_UP:    tail_y--;
+                               if (tail_y == BOARD_Y_WRAP_MIN) tail_y = BOARD_Y_MAX;
+                               break;
+        case PLAYER_DIR_DOWN:  tail_y++;
+                               if (tail_y > BOARD_Y_MAX) tail_y = BOARD_Y_MIN;
+                               break;
+        case PLAYER_DIR_LEFT:  tail_x--;
+                               if (tail_x == BOARD_X_WRAP_MIN) tail_x = BOARD_X_MAX;
+                               break;
+        case PLAYER_DIR_RIGHT: tail_x++;
+                               if (tail_x > BOARD_X_MAX) tail_x = BOARD_X_MIN;
+                               break;
+    }                  
 
     // Save new tail position
-    player_x_tail[player_id] = new_x;
-    player_y_tail[player_id] = new_y;
+    snakes[p_num].tail_x = tail_x;
+    snakes[p_num].tail_y = tail_y;
 
+    set_bkg_tile_xy(tail_x, tail_y, snake_calc_tile_tail(p_num, DIR_BITS_FROM_BOARD( game_board[ BOARD_INDEX(tail_x, tail_y) ] )) );
+    set_bkg_tile_xy(old_tail_x, old_tail_y, BLANK_TILE);
 }
 
-*/
 
 // In addition to processing input and events from the
 // data packets, this function also "ticks" the game.
@@ -246,7 +335,7 @@ static void player_tail_increment(uint8_t move_dir, uint8_t player_id) {
 // so that it appears on each console at the same exact time
 // and in the same exact order.
 //
-void snakes_process_packet_input_and_tick_game(void) {
+bool snakes_process_packet_input_and_tick_game(void) {
     static uint8_t c;
 
     // One game tick per 4 Player data packet
@@ -272,66 +361,37 @@ void snakes_process_packet_input_and_tick_game(void) {
                 // Save D-Pad button press for when the snake is next able to turn
                 // Block snake turning back onto itself
                 uint8_t dir_request = value & _SIO_DATA_MASK;
-                if (dir_request && (player_dir[c] != dir_opposite[dir_request]))
-                    player_dir_next[c] = dir_request;
+                if (dir_request && (snakes[c].dir != dir_opposite[dir_request]))
+                    snakes[c].dir_next = dir_request;
             }
             
             // Apply movement
             if ((game_tick & 0x0Fu) == 0u) {  // TODO: more granular movement, make a counter that resets and counts down
 
                 // Cache current dur as prev for calculating turns
-                player_dir_prev[c] = player_dir[c];
+                snakes[c].dir_prev = snakes[c].dir;
 
                 // Check for direction change request
-                if (player_dir_next[c]) {
-                    player_dir[c]      = player_dir_next[c];
-                    player_dir_next[c] = PLAYER_DIR_NONE;
+                if (snakes[c].dir_next) {
+                    snakes[c].dir      = snakes[c].dir_next;
+                    snakes[c].dir_next = PLAYER_DIR_NONE;
                 }
 
-                // Draw body segment at current location (straight or corner) based on movement
-                // dir into current tile (dir_prev[]) and movement dir into next tile (dir[])
-                uint8_t body_tile_id;
-                if (player_dir_prev[c] & (PLAYER_DIR_LEFT | PLAYER_DIR_RIGHT))
-                    body_tile_id = snake_tile_body_horiz_lut[ player_dir_prev[c] | player_dir[c] ];
-                else
-                    body_tile_id = snake_tile_body_vert_lut[ player_dir_prev[c] | player_dir[c] ];
-                if (is_your_player) body_tile_id += TILE_OTHERS_OFFSET;
-                set_bkg_tile_xy(player_x_head[c], player_y_head[c], body_tile_id);
-
-                // Move head
-                switch (player_dir[c]) {
-                    case PLAYER_DIR_UP:    player_y_head[c]--;
-                                           if (player_y_head[c] == BOARD_Y_WRAP_MIN) player_y_head[c] = BOARD_Y_MAX;
-                                           break;
-                    case PLAYER_DIR_DOWN:  player_y_head[c]++;
-                                           if (player_y_head[c] > BOARD_Y_MAX) player_y_head[c] = BOARD_Y_MIN;
-                                           break;
-                    case PLAYER_DIR_LEFT:  player_x_head[c]--;
-                                           if (player_x_head[c] == BOARD_X_WRAP_MIN) player_x_head[c] = BOARD_X_MAX;
-                                           break;
-                    case PLAYER_DIR_RIGHT: player_x_head[c]++;
-                                           if (player_x_head[c] > BOARD_X_MAX) player_x_head[c] = BOARD_X_MIN;
-                                           break;
-                }                  
-
-                // Draw head tile at new location
-                uint8_t head_tile_id = snake_tile_head_lut[ player_dir[c] ];
-                if (is_your_player) head_tile_id += TILE_OTHERS_OFFSET;
-
-                set_bkg_tile_xy(player_x_head[c], player_y_head[c], head_tile_id);
-
-                // uint8_t try_move = snake_head_increment(c, is_your_player);
-                // if (try_move == HEAD_INC_COLLIDED) {
-                //     // Game over, propagate result upward
-                // }
-                // else if (try_move == HEAD_INC_GROW_SNAKE) {
-                // }
-                // else {
-                //     // snake_head_increment(player_dir[c], c, is_your_player);
-                // }
+                uint8_t try_move = snake_head_increment(c);
+                if (try_move == HEAD_INC_COLLIDED) {
+                    return false;   // Game over
+                }
+                else if (try_move == HEAD_INC_GROW_SNAKE) {
+                    // Ate food, in order to grow the snake don't increment the tail
+                }
+                else {
+                    snake_tail_increment(c);
+                }
             }
         }
         player_id_bit <<= 1;
     }
+
+    return true;
 }
 
