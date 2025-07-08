@@ -40,9 +40,11 @@ void main(void){
         #ifdef DEBUG_LOCAL_SINGLE_PLAYER_ONLY
             title_screen_init();
             gameplay_run_local_only();
+            gameover_run_local_only();
         #else
             title_screen_run();
             gameplay_run();
+            gameover_run();
         #endif
     }
 }

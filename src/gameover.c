@@ -12,56 +12,61 @@
 #include "snakes.h"
 
 
-#define RX_BUF_INITIAL_PACKET_IGNORE_COUNT   4   // Number of initial packets to ignore, works for TX size of 1. May need research for larger values
-uint8_t rx_packet_ignore_count;
+void gameover_init(void) {
+
+    set_bkg_based_tiles( ((DEVICE_SCREEN_PX_WIDTH - game_over_WIDTH) / game_over_TILE_W) / 2u,
+                         ((DEVICE_SCREEN_PX_HEIGHT - game_over_HEIGHT) / game_over_TILE_H) / 2u,
+                         (game_over_WIDTH / game_over_TILE_W),
+                         (game_over_HEIGHT / game_over_TILE_H),
+                         game_over_map, (uint8_t)GAME_OVER_TILES_START);
 
 
-static void gameplay_init(void) {
-
-    // // Load map and tiles
-    // set_bkg_data(BG_TITLE_BG_TILES_START, title_bg_TILE_COUNT, title_bg_tiles);
-    // set_bkg_tiles(0,0, (title_bg_WIDTH / title_bg_TILE_W),
-    //                    (title_bg_HEIGHT / title_bg_TILE_H), title_bg_map);
-
-    // set_bkg_data((uint8_t)BG_CHECKBOX_TILES_START, checkbox_TILE_COUNT, checkbox_tiles);
-    // set_bkg_data((uint8_t)BG_FONT_NUMS_TILES_START, font_nums_TILE_COUNT, font_nums_tiles);
-
-    // set_sprite_data(SPR_YOU_ARROW_SPR_TILES_START, you_arrow_spr_TILE_COUNT, you_arrow_spr_tiles);
-    // set_sprite_data(SPR_SNAKE_TILES_START, snake_tiles_spr_TILE_COUNT, snake_tiles_spr_tiles);
-    // hide_sprites_range(0, MAX_HARDWARE_SPRITES);
-
-    // Cover title screen info
-    fill_bkg_rect(0,0,DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT, BLANK_TILE);
-
-    snakes_reset_and_draw();
     hide_sprites_range(0, MAX_HARDWARE_SPRITES);
-
-    rx_packet_ignore_count = RX_BUF_INITIAL_PACKET_IGNORE_COUNT;
 }
+
+
+static bool process_packet_check_button_press(void) {
+
+    static uint8_t c;
+
+    uint8_t player_id_bit = _4P_PLAYER_1;
+
+    // Loop through all bytes in the packet.
+    // Each byte in the packet represents input/commands
+    // from one of the players (0..3)
+    for (c = 0; c < _4P_XFER_RX_SZ; c++) {
+
+        if (IS_PLAYER_CONNECTED(player_id_bit)) {
+
+            // Check for player commands
+            uint8_t value = _4p_rx_buf_READ_ptr[c];
+
+            // D-Pad input type command
+            if ((value & _SIO_CMD_MASK) == _SIO_CMD_BUTTONS) {
+
+                // Save D-Pad button press for when the snake is next able to turn
+                // Block snake turning back onto itself
+                if (value & _SIO_DATA_MASK) return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 
 
 static bool process_packets(void) {
 
-    #ifdef DISPLAY_USE_SIO_DATA_DURATION_IN_BGP
-        BGP_REG = ~BGP_REG;
-    #endif
 
     // Read number of packets ready and cache it locally (it may change during processing)
     uint8_t packets_ready = four_player_rx_buf_get_num_packets_ready();
 
     for (uint8_t packet = 0; packet < packets_ready; packet++) {
 
-        // Skip initial packets if requested
-        if (rx_packet_ignore_count)
-            rx_packet_ignore_count--;
-        else {
-            if (snakes_process_packet_input_and_tick_game() == false) {
-                #ifdef DISPLAY_USE_SIO_DATA_DURATION_IN_BGP
-                    BGP_REG = ~BGP_REG;
-                #endif
-                return false;
-            }
-        }
+        // If a button was pressed then time to exit Game Over screen
+        if (process_packet_check_button_press() == true)
+            return false;
 
         // Move to next packet RX Bytes                
         _4p_rx_buf_packet_increment_read_ptr();
@@ -70,17 +75,13 @@ static bool process_packets(void) {
     // free up the rx buf space now that it's done being used
     four_player_rx_buf_remove_n_packets(packets_ready);
 
-    #ifdef DISPLAY_USE_SIO_DATA_DURATION_IN_BGP
-        BGP_REG = ~BGP_REG;
-    #endif
-
     return true;
 }
 
 
-void gameplay_run(void){
+void gameover_run(void){
 
-    gameplay_init();
+    gameover_init();
 
     while (1) {
         UPDATE_KEYS();
@@ -88,25 +89,17 @@ void gameplay_run(void){
 
         if (IS_PLAYER_DATA_READY()) {
             if (process_packets() == false) {
-                // Handle Game Over: back to main loop
+                // Handle exit Game Over screen
+                four_player_request_change_to_ping_mode();
                 return;
             }
         }
 
-        // Exit title screen once mode is switched to PING
-        if (GET_CURRENT_MODE() == _4P_STATE_PING)
-            return;
-
-        // Load D-Pad TX data for next frame
+        // Load button ticked TX data for next frame
         // Only send data when there is a discrete event
-        uint8_t dpad_ticked = GET_KEYS_TICKED(J_DPAD);
-        if (dpad_ticked != 0u) {
-            four_player_set_xfer_data(_SIO_CMD_DPAD | dpad_ticked);
-        }
-
-
-        if (KEY_TICKED(J_B)) {
-            four_player_request_change_to_ping_mode();
+        uint8_t buttons_ticked = (GET_KEYS_TICKED(J_START | J_A | J_B | J_SELECT)) >> 4;
+        if (buttons_ticked != 0u) {
+            four_player_set_xfer_data(_SIO_CMD_BUTTONS | buttons_ticked);
         }
     }
 }
@@ -145,14 +138,14 @@ void gameplay_run(void){
     }
 
 
-    void gameplay_run_local_only(void){
+    void gameover_run_local_only(void){
 
         // Debug, set only local player present
         // _4p_connect_status = _4P_PLAYER_1 | PLAYER_1;
         // _4p_connect_status = (_4P_PLAYER_1 | _4P_PLAYER_3) | PLAYER_1;
         _4p_connect_status = (_4P_PLAYER_1 | _4P_PLAYER_2 | _4P_PLAYER_3 | _4P_PLAYER_4) | PLAYER_1;
 
-        gameplay_init();
+        gameover_init();
         _4p_mock_init_xfer_buffers();
 
         while (1) {
@@ -161,18 +154,17 @@ void gameplay_run(void){
 
             if (IS_PLAYER_DATA_READY()) {
                 if (process_packets() == false) {
-                    // Handle Game Over: back to main loop
+                    // Handle exit Game Over screen                    
                     return;
                 }
             }
 
-            // Load D-Pad TX data for next frame
+            // Load button ticked TX data for next frame
             // Only send data when there is a discrete event
-
-            uint8_t dpad_ticked = GET_KEYS_TICKED(J_DPAD);
-            if (dpad_ticked != 0u) {
-                four_player_set_xfer_data(_SIO_CMD_DPAD | dpad_ticked);
-            } 
+            uint8_t buttons_ticked = (GET_KEYS_TICKED(J_START | J_A | J_B | J_SELECT)) >> 4;
+            if (buttons_ticked != 0u) {
+                four_player_set_xfer_data(_SIO_CMD_BUTTONS | buttons_ticked);
+            }
             else {
                 // clear tx data, this would normally be done in the serial ISR as it transmitted
                 _4P_xfer_tx_data = 0x00;

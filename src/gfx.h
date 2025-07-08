@@ -11,6 +11,7 @@
 
 #include "snake_tiles.h"
 #include "board_tiles.h"
+#include "game_over.h"
 
 #define BG_TITLE_BG_TILES_START      0u
 #define BG_CHECKBOX_TILES_START      (BG_TITLE_BG_TILES_START + title_bg_TILE_COUNT)
@@ -64,6 +65,8 @@
 
 #define BOARD_TILES_START       (SNAKE_TILES_START + (uint8_t)snake_tiles_TILE_COUNT)
     #define BOARD_TILE_HEART    (BOARD_TILES_START + 0u)
+
+#define GAME_OVER_TILES_START       (BOARD_TILES_START + board_tiles_TILE_COUNT)
 
 #endif // _GFX_H
 
