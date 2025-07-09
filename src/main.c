@@ -9,6 +9,7 @@
 
 #include "title_screen.h"
 #include "gameplay.h"
+#include "gameover.h"
 
 
 static void main_init(void) {

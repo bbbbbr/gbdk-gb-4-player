@@ -40,7 +40,7 @@ void title_screen_init(void) {
     set_sprite_data(BOARD_TILES_START, board_tiles_TILE_COUNT, board_tiles_tiles);
 
     // Game Over Tiles
-    set_sprite_data(GAME_OVER_TILES_START, game_over_TILE_COUNT, game_over_tiles);
+    set_sprite_data((uint8_t)GAME_OVER_TILES_START, game_over_TILE_COUNT, game_over_tiles);
 
     hide_sprites_range(0, MAX_HARDWARE_SPRITES);
 }
