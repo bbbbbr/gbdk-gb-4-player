@@ -6,7 +6,7 @@ Status:
 - 4-player adapter: Protocol implemented and entirely working. Code in src: [4_player_adapter.c](src/4_player_adapter.c) and [4_player_adapter.h](src/4_player_adapter.h)
 - Gameplay: Basic gameplay only at present. Player input wired up and working, snakes grow, snakes collide, game can end.
 
-![Photograph of four Game Boy and clone consoles connected via the Four Player Adapter](/info/game_boy_4_player_consoles.gif)
+![Photograph of four Game Boy and clone consoles connected via the Four Player Adapter](/info/game_boy_four_player_consoles.gif)
 
 # Game Implementation
 
