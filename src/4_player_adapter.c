@@ -348,7 +348,18 @@ static void sio_handle_mode_restart_ping(void) {
 }
 
 
-void four_player_sio_isr(void) CRITICAL INTERRUPT {
+#ifdef FOUR_PLAYER_BARE_ISR_VECTOR
+    void four_player_sio_isr(void) INTERRUPT __naked {
+
+        __asm \
+            push af
+            push bc
+            push de
+            push hl
+        __endasm;
+#else
+    void four_player_sio_isr(void) {
+#endif
 
     #ifdef DISPLAY_SIO_ISR_DURATION_IN_BGP
         BGP_REG = ~BGP_REG;
@@ -374,9 +385,30 @@ void four_player_sio_isr(void) CRITICAL INTERRUPT {
     #ifdef DISPLAY_SIO_ISR_DURATION_IN_BGP
         BGP_REG = ~BGP_REG;
     #endif
-}
-// Install direct interrupt handler
-ISR_VECTOR(VECTOR_SERIAL, four_player_sio_isr)
+
+#ifdef FOUR_PLAYER_BARE_ISR_VECTOR
+        __asm \
+            pop hl
+            pop de
+            pop bc
+            // Wait for safe VRAM access time to exit
+            // in case interrupted code was writing to VRAM
+            // (Check if in LCD modes 0 or 1)    
+            $1:
+                LDH  A, (_STAT_REG)
+                AND  #STATF_BUSY
+                JR   NZ, $1
+            pop af
+
+            reti
+        __endasm;
+    }
+
+    // Install direct interrupt handler
+    ISR_VECTOR(VECTOR_SERIAL, four_player_sio_isr)
+#else
+    }
+#endif
 
 
 // =================== General Enable/Disable Commands ===================
@@ -388,6 +420,14 @@ void four_player_enable(void) {
             // Avoid double-install by trying to remove first
             remove_VBL(four_player_vbl_isr);
             add_VBL(four_player_vbl_isr);
+
+            // Only install four player serial handler via 
+            // GBDK serial interrupt dispatcher if it isn't
+            // using a bare IR vector
+            #ifndef FOUR_PLAYER_BARE_ISR_VECTOR
+                remove_SIO(four_player_sio_isr);
+                add_SIO(four_player_sio_isr);
+            #endif
         }
     #endif
 
@@ -402,6 +442,10 @@ void four_player_disable(void) {
     #ifdef ENABLE_SIO_KEEPALIVE
         CRITICAL {
             remove_VBL(four_player_vbl_isr);
+
+            #ifndef FOUR_PLAYER_BARE_ISR_VECTOR
+                remove_SIO(four_player_sio_isr);
+            #endif
         }
     #endif
 

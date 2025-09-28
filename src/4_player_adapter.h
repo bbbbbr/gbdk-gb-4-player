@@ -3,6 +3,10 @@
 
 #include "common.h"
 
+// Control whether the serial handler is installed as a bare vector
+// or if it needs to be installed via add_SIO()
+// The bare vector is faster, but cannot be installed
+#define FOUR_PLAYER_BARE_ISR_VECTOR
 
 #define SIO_KEEPALIVE_RESET   60u
 #define SIO_KEEPALIVE_TIMEOUT 0u
