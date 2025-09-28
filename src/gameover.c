@@ -1,6 +1,5 @@
 #include <gbdk/platform.h>
 #include <stdint.h>
-#include <string.h>
 
 #include "common.h"
 #include "input.h"

@@ -26,7 +26,7 @@
 
 
 #define BOARD_WIDTH         (DEVICE_SCREEN_WIDTH)
-#define BOARD_HEIGHT        (DEVICE_SCREEN_HEIGHT)
+#define BOARD_HEIGHT        (DEVICE_SCREEN_HEIGHT - 2)
 #define BOARD_X_MAX         (BOARD_WIDTH - 1u)
 #define BOARD_Y_MAX         (BOARD_HEIGHT - 1u)
 #define BOARD_X_MIN         (0u)
@@ -35,6 +35,15 @@
 #define BOARD_Y_WRAP_MIN    ((uint8_t)-1)
 
 #define BOARD_INDEX(x,y)    ((y * BOARD_WIDTH) + x)
+
+#define BOARD_UI_X_START    (0u)
+#define BOARD_UI_Y_START    (BOARD_Y_MAX + 1u)
+
+#define BOARD_UI_PRINT_Y    (BOARD_UI_Y_START + 1u)
+#define BOARD_UI_PRINT_X_P1 ( 4u)
+#define BOARD_UI_PRINT_X_P2 ( 8u)
+#define BOARD_UI_PRINT_X_P3 (12u)
+#define BOARD_UI_PRINT_X_P4 (16u)
 
 // Bits stored per board/tile entry
 // 7..4 : direction

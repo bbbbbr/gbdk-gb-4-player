@@ -1,6 +1,5 @@
 #include <gbdk/platform.h>
 #include <stdint.h>
-#include <string.h>
 
 #include "common.h"
 #include "input.h"
@@ -31,13 +30,17 @@ void title_screen_init(void) {
                        (title_bg_HEIGHT / title_bg_TILE_H), title_bg_map);
 
     set_bkg_data((uint8_t)BG_CHECKBOX_TILES_START, checkbox_TILE_COUNT, checkbox_tiles);
+
     set_bkg_data((uint8_t)BG_FONT_NUMS_TILES_START, font_nums_TILE_COUNT, font_nums_tiles);
+    set_bkg_data((uint8_t)BG_FONT_NUMS_NO_OUTLINE_TILES_START, font_nums_no_outline_TILE_COUNT, font_nums_no_outline_tiles);
 
     set_sprite_data(SPR_YOU_ARROW_SPR_TILES_START, you_arrow_spr_TILE_COUNT, you_arrow_spr_tiles);
 
     // Game BG Tiles
     set_sprite_data(SNAKE_TILES_START, snake_tiles_TILE_COUNT, snake_tiles_tiles);
     set_sprite_data(BOARD_TILES_START, board_tiles_TILE_COUNT, board_tiles_tiles);
+    
+    set_sprite_data(BOARD_UI_TILES_START, board_ui_TILE_COUNT, board_ui_tiles);
 
     // Game Over Tiles
     set_sprite_data((uint8_t)GAME_OVER_TILES_START, game_over_TILE_COUNT, game_over_tiles);

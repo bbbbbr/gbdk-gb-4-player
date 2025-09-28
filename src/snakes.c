@@ -1,7 +1,6 @@
 #include <gbdk/platform.h>
 #include <rand.h>
 #include <stdint.h>
-#include <string.h>
 
 #include "common.h"
 #include "input.h"
@@ -10,6 +9,7 @@
 #include "4_player_adapter.h"
 
 #include "gfx.h"
+#include "board_ui_fn.h"
 
 #include "snakes.h"
 
@@ -27,6 +27,9 @@ typedef struct {
 
     uint8_t tail_x;
     uint8_t tail_y;
+
+    uint8_t size_digit_lo; // Lower digit 0-9
+    uint8_t size_digit_hi; // Upper digit 0-9 as 00 - 90
 } snake_t;
 
 snake_t snakes[PLAYER_NUM_MAX];
@@ -106,8 +109,9 @@ static uint8_t snake_calc_tile_body(uint8_t p_num);
 
 static void snake_board_reset(void);
 
-static uint8_t snake_head_increment(uint8_t p_num);
+static uint8_t snake_try_head_increment(uint8_t p_num);
 static void snake_tail_increment(uint8_t p_num);
+static void snake_length_increment_and_render(uint8_t p_num);
 
 
 static void rand_and_food_reset(void) {
@@ -181,7 +185,7 @@ static void food_spawn_new(void) {
 static uint8_t snake_calc_tile_head(uint8_t p_num) {
 
     // Draw tile for player
-    // Use different tile for this player vs others
+    // Use different tile / color for this player vs others
     uint8_t tile_id = snake_tile_head_lut[ snakes[p_num].dir ];
     if (WHICH_PLAYER_AM_I_ZERO_BASED() != p_num) tile_id += TILE_OTHERS_OFFSET;
 
@@ -264,6 +268,10 @@ void snakes_reset_and_draw(void) {
             snakes[c].tail_x = PLAYER_X_HEAD_START_STEP * (c + 1u);
             snakes[c].tail_y = PLAYER_Y_HEAD_START + (PLAYER_LEN_START - 1u);
 
+            snakes[c].size_digit_lo = PLAYER_LEN_START;
+            snakes[c].size_digit_hi = 0u;
+            board_ui_print_snake_size(c, snakes[c].size_digit_lo, snakes[c].size_digit_hi);
+
             // Now draw them
             set_bkg_tile_xy(head_x, head_y,      snake_calc_tile_head(c));
             set_bkg_tile_xy(head_x, head_y + 1, snake_calc_tile_body(c));
@@ -274,7 +282,8 @@ void snakes_reset_and_draw(void) {
 }
 
 
-static uint8_t snake_head_increment(uint8_t p_num) {
+// Try to move the snake to a new tile
+static uint8_t snake_try_head_increment(uint8_t p_num) {
 
     uint8_t head_x;
     uint8_t head_y;
@@ -286,7 +295,7 @@ static uint8_t snake_head_increment(uint8_t p_num) {
     uint8_t board_player_data = snakes[p_num].dir | p_num; // TODO make a macro out of this
     game_board[ BOARD_INDEX(head_x, head_y) ] = PLAYER_BITS_TO_BOARD(p_num);
 
-    // Increment tail and handle wraparound
+    // Increment head and handle screen edge wraparound
     switch (snakes[p_num].dir) {
         case PLAYER_DIR_UP:    head_y--;
                                if (head_y == BOARD_Y_WRAP_MIN) head_y = BOARD_Y_MAX;
@@ -323,12 +332,14 @@ static uint8_t snake_head_increment(uint8_t p_num) {
         snakes[p_num].head_x = head_x;
         snakes[p_num].head_y = head_y;
 
+        // Check for food at new location
         if (board_data_new & BOARD_FOOD_BIT)
             return HEAD_INC_GROW_SNAKE; // Success, and grow snake (i.e. don't increment tail)
         else
             return HEAD_INC_OK; // Success, no collision
+
     } else {
-        // Failure, do NOT update head to new position
+        // Collision! Do NOT update head to new position
         return HEAD_INC_COLLIDED;
     }
 }
@@ -372,6 +383,25 @@ static void snake_tail_increment(uint8_t p_num) {
 
     set_bkg_tile_xy(tail_x, tail_y, snake_calc_tile_tail(p_num, DIR_BITS_FROM_BOARD( game_board[ BOARD_INDEX(tail_x, tail_y) ] )) );
     set_bkg_tile_xy(old_tail_x, old_tail_y, BLANK_TILE);
+}
+
+
+// Increment bcd-ish snake length counter and show it on the overlay
+static void snake_length_increment_and_render(uint8_t p_num) {
+
+    // Increment upper digit if wrapping around
+    if (snakes[p_num].size_digit_lo == 9u) {
+        // Only increment if total is less than 99
+        if (snakes[p_num].size_digit_hi != 9u) {
+            snakes[p_num].size_digit_lo = 0u;
+            snakes[p_num].size_digit_hi++;
+        }
+    }
+    else {
+        snakes[p_num].size_digit_lo++;
+    }
+
+    board_ui_print_snake_size(p_num, snakes[p_num].size_digit_lo, snakes[p_num].size_digit_hi);
 }
 
 
@@ -432,12 +462,15 @@ bool snakes_process_packet_input_and_tick_game(void) {
                     snakes[c].dir_next = PLAYER_DIR_NONE;
                 }
 
-                uint8_t try_move = snake_head_increment(c);
+                uint8_t try_move = snake_try_head_increment(c);
                 if (try_move == HEAD_INC_COLLIDED) {
                     // Could do tail shrink and point loss when snakes collide
                     return false;   // Game over
                 }
                 else if (try_move == HEAD_INC_GROW_SNAKE) {
+
+                    snake_length_increment_and_render(c);
+
                     // Ate food, in order to grow the snake don't increment the tail
                     if (food_currently_spawned_count) food_currently_spawned_count--;
 
@@ -446,6 +479,7 @@ bool snakes_process_packet_input_and_tick_game(void) {
                     food_eaten_total++;
                 }
                 else {
+                    // No food eaten, snake stays same size
                     snake_tail_increment(c);
                 }
             }

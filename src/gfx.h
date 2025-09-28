@@ -6,11 +6,14 @@
 #include "title_bg.h"
 #include "checkbox.h"
 #include "font_nums.h"
+#include "font_nums_no_outline.h"
 
 #include "you_arrow_spr.h"
 
 #include "snake_tiles.h"
 #include "board_tiles.h"
+#include "board_ui.h"
+
 #include "game_over.h"
 
 #define BG_TITLE_BG_TILES_START      0u
@@ -67,6 +70,11 @@
     #define BOARD_TILE_HEART    (BOARD_TILES_START + 0u)
 
 #define GAME_OVER_TILES_START       (BOARD_TILES_START + board_tiles_TILE_COUNT)
+
+#define BOARD_UI_TILES_START              (GAME_OVER_TILES_START + game_over_TILE_COUNT)
+
+#define BG_FONT_NUMS_NO_OUTLINE_TILES_START     (BOARD_UI_TILES_START + board_ui_TILE_COUNT)
+
 
 #endif // _GFX_H
 

@@ -1,6 +1,5 @@
 #include <gbdk/platform.h>
 #include <stdint.h>
-#include <string.h>
 
 #include "common.h"
 #include "input.h"
@@ -31,7 +30,9 @@ static void gameplay_init(void) {
     // hide_sprites_range(0, MAX_HARDWARE_SPRITES);
 
     // Cover title screen info
-    fill_bkg_rect(0,0,DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT, BLANK_TILE);
+    fill_bkg_rect(0u, 0u, DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT, BLANK_TILE);
+    set_bkg_based_tiles(BOARD_UI_X_START, BOARD_UI_Y_START, board_ui_WIDTH / board_ui_TILE_W, board_ui_HEIGHT / board_ui_TILE_H, board_ui_map, BOARD_UI_TILES_START);
+
 
     snakes_reset_and_draw();
     hide_sprites_range(0, MAX_HARDWARE_SPRITES);
