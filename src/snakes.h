@@ -59,9 +59,9 @@
 #define BOARD_PLAYER_BITS       0x03u
 #define BOARD_EXCEPT_FOOD_MASK (BOARD_TAIL_DIR_BITS | BOARD_COLLISION_BIT | BOARD_PLAYER_BITS)
 
-#define FOOD_SPAWNED_NONE          0u
+#define FOOD_SPAWNED_NONE          0u       // Change to SPAWNED_MAX for Up to N foods on board
 #define FOOD_TIMER_COUNT_DONE      0u
-#define FOOD_SPAWN_TIMER_MIN     (60u * 4u)  // 4 seconds Min
+#define FOOD_SPAWN_TIMER_MIN     (60u * 2u)  // 2 seconds Min
 #define FOOD_SPAWN_TIMER_RANGE   0xFFu // 256, which is about 4 seconds - to avoid more expensive modulo calc// (60u * 5u)  // 0-5 seconds range
 
 
