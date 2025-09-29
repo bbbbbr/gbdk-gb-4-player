@@ -28,11 +28,16 @@ typedef struct {
     uint8_t tail_x;
     uint8_t tail_y;
 
-    uint8_t size_digit_lo; // Lower digit 0-9
     uint8_t size_digit_hi; // Upper digit 0-9 as 00 - 90
+    uint8_t size_digit_lo; // Lower digit 0-9
+
+    bool is_alive;
 } snake_t;
 
 snake_t snakes[PLAYER_NUM_MAX];
+
+uint8_t snakes_alive_count;
+uint8_t snakes_alive_count_prev;
 
 // Laid out as Rows, so: (y * BOARD_WIDTH) + x -> BOARD_INDEX(x,y)
 uint8_t game_board[BOARD_WIDTH * BOARD_HEIGHT];
@@ -154,7 +159,7 @@ static void food_spawn_new(void) {
     // Start with one food pellet in the middle
     // Upshift by 1 to increase range
     food_spawn_timer = ((uint16_t)FAST_RAND_MODULO_8(FOOD_SPAWN_TIMER_RANGE) << 1)+ FOOD_SPAWN_TIMER_MIN;
-    
+
     uint8_t spawn_x = FAST_RAND_MODULO_8(BOARD_WIDTH);
     uint8_t spawn_y = FAST_RAND_MODULO_8(BOARD_HEIGHT);
 
@@ -225,7 +230,7 @@ static void snake_board_reset(void) {
     uint8_t * p_board = game_board;
 
     for (uint8_t y = 0; y < BOARD_HEIGHT; y++) {
-        for (uint8_t x = 0; x < BOARD_WIDTH; x++) {                        
+        for (uint8_t x = 0; x < BOARD_WIDTH; x++) {
             *p_board++  = BOARD_CLEAR;
         }
     }
@@ -238,6 +243,7 @@ static void snake_board_reset(void) {
 
 void snakes_reset_and_draw(void) {
 
+    snakes_alive_count    = 0u; // Reset to zero, increment +1 for every connected player
     game_tick             = 0u;
     game_tick_speed       = GAME_TICK_SPEED_START;
     uint8_t player_id_bit = _4P_PLAYER_1;
@@ -246,6 +252,9 @@ void snakes_reset_and_draw(void) {
 
     for (uint8_t c = 0u; c < PLAYER_NUM_MAX; c++) {
         if (IS_PLAYER_CONNECTED(player_id_bit)) {
+
+            snakes_alive_count++;
+            snakes[c].is_alive = true;
 
             snakes[c].dir      = PLAYER_DIR_UP;
             snakes[c].dir_next = PLAYER_DIR_UP;
@@ -277,8 +286,58 @@ void snakes_reset_and_draw(void) {
             set_bkg_tile_xy(head_x, head_y + 1, snake_calc_tile_body(c));
             set_bkg_tile_xy(head_x, head_y + 2, snake_calc_tile_tail(c, snakes[c].dir));
         }
-        player_id_bit <<= 1;        
-    }    
+        player_id_bit <<= 1;
+    }
+}
+
+
+// Render a snake as dead on the board
+// Filling it's tiles with skulls marked as collide-able
+void snakes_render_dead( uint8_t p_num) {
+
+    static bool  is_this_player;
+    static uint8_t skull_icon;
+    static uint8_t head_x, head_y;
+
+    is_this_player = WHICH_PLAYER_AM_I_ZERO_BASED() == p_num;
+    skull_icon = (is_this_player) ? BOARD_TILE_SKULL_DARK : BOARD_TILE_SKULL_LITE;
+
+    head_x = snakes[p_num].head_x;
+    head_y = snakes[p_num].head_y;
+
+    uint8_t x = snakes[p_num].tail_x;
+    uint8_t y = snakes[p_num].tail_y;
+
+    // Traverse snake from tail to head
+    while (1) {
+        // Render a skull icon onto current snake tile, set it into board
+        set_bkg_tile_xy(x, y, skull_icon);
+
+        uint8_t * p_board = game_board + BOARD_INDEX(x, y);
+        // Clear board at current (soon to be former) tail position
+        uint8_t board_data = *p_board;
+        *p_board = BOARD_COLLISION_BIT;
+
+        // Exit loop when the head is reached and overwritten
+        if ((x == head_x) && (y == head_y)) break;
+
+        // Retrieve dir of tail from board
+        // Increment tail and handle wraparound
+        switch ( DIR_BITS_FROM_BOARD(board_data) ) {
+            case PLAYER_DIR_UP:    y--;
+                                   if (y == BOARD_Y_WRAP_MIN) y = BOARD_Y_MAX;
+                                   break;
+            case PLAYER_DIR_DOWN:  y++;
+                                   if (y > BOARD_Y_MAX) y = BOARD_Y_MIN;
+                                   break;
+            case PLAYER_DIR_LEFT:  x--;
+                                   if (x == BOARD_X_WRAP_MIN) x = BOARD_X_MAX;
+                                   break;
+            case PLAYER_DIR_RIGHT: x++;
+                                   if (x > BOARD_X_MAX) x = BOARD_X_MIN;
+                                   break;
+        }
+    }
 }
 
 
@@ -291,7 +350,7 @@ static uint8_t snake_try_head_increment(uint8_t p_num) {
     uint8_t old_head_y = head_y = snakes[p_num].head_y;
 
     // Store final move_dir in current position
-    // (which will soon become previous position)    
+    // (which will soon become previous position)
     uint8_t board_player_data = snakes[p_num].dir | p_num; // TODO make a macro out of this
     game_board[ BOARD_INDEX(head_x, head_y) ] = PLAYER_BITS_TO_BOARD(p_num);
 
@@ -309,7 +368,7 @@ static uint8_t snake_try_head_increment(uint8_t p_num) {
         case PLAYER_DIR_RIGHT: head_x++;
                                if (head_x > BOARD_X_MAX) head_x = BOARD_X_MIN;
                                break;
-    }                  
+    }
 
 
     // Check for collision at new location, otherwise check for snake food or empty
@@ -375,7 +434,7 @@ static void snake_tail_increment(uint8_t p_num) {
         case PLAYER_DIR_RIGHT: tail_x++;
                                if (tail_x > BOARD_X_MAX) tail_x = BOARD_X_MIN;
                                break;
-    }                  
+    }
 
     // Save new tail position
     snakes[p_num].tail_x = tail_x;
@@ -423,6 +482,8 @@ bool snakes_process_packet_input_and_tick_game(void) {
     // One game tick per 4 Player data packet
     game_tick++;
 
+    snakes_alive_count_prev = snakes_alive_count;
+
     uint8_t my_player_num = WHICH_PLAYER_AM_I_ZERO_BASED();
     uint8_t player_id_bit = _4P_PLAYER_1;
 
@@ -434,6 +495,9 @@ bool snakes_process_packet_input_and_tick_game(void) {
         bool is_your_player = (my_player_num == c);
 
         if (IS_PLAYER_CONNECTED(player_id_bit)) {
+
+            // Skip players that have died
+            if (snakes[c].is_alive == false) continue;
 
             // Check for player commands
             uint8_t value = _4p_rx_buf_READ_ptr[c];
@@ -449,7 +513,7 @@ bool snakes_process_packet_input_and_tick_game(void) {
                 if (dir_request && (snakes[c].dir != dir_opposite[dir_request]))
                     snakes[c].dir_next = dir_request;
             }
-            
+
             // Apply movement
             if ((game_tick & 0x0Fu) == 0u) {  // TODO: more granular movement, make a counter that resets and counts down
 
@@ -463,9 +527,24 @@ bool snakes_process_packet_input_and_tick_game(void) {
                 }
 
                 uint8_t try_move = snake_try_head_increment(c);
+                // TODO: move this handling to a function
                 if (try_move == HEAD_INC_COLLIDED) {
+
                     // Could do tail shrink and point loss when snakes collide
-                    return false;   // Game over
+                    // return false;   // Game over
+                    snakes[c].is_alive = false;
+
+                    snakes_alive_count--;
+                    snakes_render_dead(c);
+                    board_ui_print_snake_size_dead(c);
+
+                    if (snakes_alive_count == 0u) {
+                        // There are now zero snakes alive, the game is over
+
+                        // TODO: Handle case where two snakes collide head-on
+                        // TODO: Handle single player game over versus (zero alive)
+                        return false;
+                    }
                 }
                 else if (try_move == HEAD_INC_GROW_SNAKE) {
 
@@ -474,7 +553,7 @@ bool snakes_process_packet_input_and_tick_game(void) {
                     // Ate food, in order to grow the snake don't increment the tail
                     if (food_currently_spawned_count) food_currently_spawned_count--;
 
-                    // TODO: maybe if food is skull snake shrinks and loses total food eaten?                    
+                    // TODO: maybe if food is skull snake shrinks and loses total food eaten?
                     // TODO: implement/display total food eaten as score/etc
                     food_eaten_total++;
                 }
@@ -484,6 +563,8 @@ bool snakes_process_packet_input_and_tick_game(void) {
                 }
             }
         }
+
+        // Move to next snake
         player_id_bit <<= 1;
     }
 
