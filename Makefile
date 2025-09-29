@@ -48,6 +48,12 @@ ifdef GBDK_DEBUG
 	LCCFLAGS += -debug -v
 endif
 
+ifdef LOCAL_ONLY_ENABLED
+	CFLAGS += -DDEBUG_LOCAL_SINGLE_PLAYER_ONLY=1
+	LCCFLAGS += -DDEBUG_LOCAL_SINGLE_PLAYER_ONLY=1
+endif
+
+
 # You can set the name of the ROM file here
 PROJECTNAME = gb4player
 
@@ -79,6 +85,9 @@ DEPS = $(OBJS:%.o=%.d)
 
 # Builds all targets sequentially
 all: $(TARGETS)
+
+localonly:
+	${MAKE} LOCAL_ONLY_ENABLED=YES
 
 # Use png2asset to convert the png into C formatted metasprite data
 # Convert metasprite .pngs in res/ -> .c files in obj/<platform ext>/src/
