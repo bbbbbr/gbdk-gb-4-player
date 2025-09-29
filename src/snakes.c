@@ -117,7 +117,7 @@ static void snake_board_reset(void);
 static uint8_t snake_try_head_increment(uint8_t p_num);
 static void snake_tail_increment(uint8_t p_num);
 static void snake_length_increment_and_render(uint8_t p_num);
-
+static bool snake_handle_head_increment_result(uint8_t p_num, uint8_t try_move);
 
 static void rand_and_food_reset(void) {
     // TODO: food_spawned_min -> allow spawning more than 1 food at a time, and increase it over time? (by getting "+" spawns that maybe are timed to vanish)
@@ -445,6 +445,47 @@ static void snake_tail_increment(uint8_t p_num) {
 }
 
 
+// Handle the result of a call to snake_try_head_increment()
+// Returns: FALSE if game is over
+static bool snake_handle_head_increment_result(uint8_t p_num, uint8_t try_move) {
+
+    if (try_move == HEAD_INC_COLLIDED) {
+
+        // Could do tail shrink and point loss when snakes collide
+        snakes[p_num].is_alive = false;
+
+        snakes_alive_count--;
+        snakes_render_dead(p_num);
+        board_ui_print_snake_size_dead(p_num);
+
+        if (snakes_alive_count == 0u) {
+            // There are now zero snakes alive, the game is over
+
+            // TODO: Handle case where two snakes collide head-on
+            // TODO: Handle single player game over versus (zero alive)
+            return false;
+        }
+    }
+    else if (try_move == HEAD_INC_GROW_SNAKE) {
+
+        snake_length_increment_and_render(p_num);
+
+        // Ate food, in order to grow the snake don't increment the tail
+        if (food_currently_spawned_count) food_currently_spawned_count--;
+
+        // TODO: maybe if food is skull snake shrinks and loses total food eaten?
+        // TODO: implement/display total food eaten as score/etc
+        food_eaten_total++;
+    }
+    else {
+        // No food eaten, snake stays same size
+        snake_tail_increment(p_num);
+    }
+
+    return true;
+}
+
+
 // Increment bcd-ish snake length counter and show it on the overlay
 static void snake_length_increment_and_render(uint8_t p_num) {
 
@@ -527,40 +568,8 @@ bool snakes_process_packet_input_and_tick_game(void) {
                 }
 
                 uint8_t try_move = snake_try_head_increment(c);
-                // TODO: move this handling to a function
-                if (try_move == HEAD_INC_COLLIDED) {
-
-                    // Could do tail shrink and point loss when snakes collide
-                    // return false;   // Game over
-                    snakes[c].is_alive = false;
-
-                    snakes_alive_count--;
-                    snakes_render_dead(c);
-                    board_ui_print_snake_size_dead(c);
-
-                    if (snakes_alive_count == 0u) {
-                        // There are now zero snakes alive, the game is over
-
-                        // TODO: Handle case where two snakes collide head-on
-                        // TODO: Handle single player game over versus (zero alive)
-                        return false;
-                    }
-                }
-                else if (try_move == HEAD_INC_GROW_SNAKE) {
-
-                    snake_length_increment_and_render(c);
-
-                    // Ate food, in order to grow the snake don't increment the tail
-                    if (food_currently_spawned_count) food_currently_spawned_count--;
-
-                    // TODO: maybe if food is skull snake shrinks and loses total food eaten?
-                    // TODO: implement/display total food eaten as score/etc
-                    food_eaten_total++;
-                }
-                else {
-                    // No food eaten, snake stays same size
-                    snake_tail_increment(c);
-                }
+                if (snake_handle_head_increment_result(c, try_move) == false)
+                    return false;
             }
         }
 
