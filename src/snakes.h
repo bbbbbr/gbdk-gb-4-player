@@ -14,10 +14,10 @@
 #define PLAYER_LEN_START         3u
 
 #define PLAYER_DIR_NONE          (0u)
-#define PLAYER_DIR_UP            (J_UP)
-#define PLAYER_DIR_DOWN          (J_DOWN)
-#define PLAYER_DIR_LEFT          (J_LEFT)
-#define PLAYER_DIR_RIGHT         (J_RIGHT)
+#define PLAYER_DIR_UP            (J_UP)    // 0x04U
+#define PLAYER_DIR_DOWN          (J_DOWN)  // 0x08U
+#define PLAYER_DIR_LEFT          (J_LEFT)  // 0x02U
+#define PLAYER_DIR_RIGHT         (J_RIGHT) // 0x01U
 
 // Check for 8 bit tile alignment before turning in N direction
 // #define PLAYER_ALIGNED_DIR_CHANGE(pixel_coord) ((pixel_coord & 0x07u) == 0)
@@ -56,7 +56,7 @@
 #define BOARD_TAIL_DIR_BITS     0xF0u  // WARNING, DON'T MAKE THIS packed to 0..3 in 2 bits since it would break collision when ((Player == 0) && (Dir==0)), relies on at least 1 bit set for any player presence
 #define BOARD_COLLISION_BIT     0x08u
 #define BOARD_FOOD_BIT          0x04u
-#define BOARD_PLAYER_BITS       0x03u
+#define BOARD_PLAYER_BITS       0x03u  // 0 .. 3
 #define BOARD_EXCEPT_FOOD_MASK (BOARD_TAIL_DIR_BITS | BOARD_COLLISION_BIT | BOARD_PLAYER_BITS)
 
 #define FOOD_SPAWNED_NONE          0u       // Change to SPAWNED_MAX for Up to N foods on board
@@ -67,7 +67,7 @@
 
 #define DIR_BITS_FROM_BOARD(board_byte)     (board_byte >> 4)
 // #define DIR_BITS_TO_BOARD(dir)           ((dir & BOARD_TAIL_DIR_BITS) >> 4)
-#define PLAYER_BITS_TO_BOARD(p_num)         ((snakes[p_num].dir << BOARD_DIR_BITSHIFT) | p_num)  // No need to bithift
+#define PLAYER_AND_DIR_BITS_TO_BOARD(p_num)         ((snakes[p_num].dir << BOARD_DIR_BITSHIFT) | p_num)
 
 #define HEAD_INC_COLLIDED     0u
 #define HEAD_INC_GROW_SNAKE   1u

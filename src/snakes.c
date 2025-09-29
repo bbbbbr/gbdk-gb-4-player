@@ -265,7 +265,7 @@ void snakes_reset_and_draw(void) {
             uint8_t head_y = snakes[c].head_y = PLAYER_Y_HEAD_START;
 
             // Record data to board
-            uint8_t board_player_data = PLAYER_BITS_TO_BOARD(c);
+            uint8_t board_player_data = PLAYER_AND_DIR_BITS_TO_BOARD(c);
             uint8_t * p_board = game_board + BOARD_INDEX(head_x, head_y );
 
             for (uint8_t row = 0; row < PLAYER_LEN_START; row++) {
@@ -352,10 +352,10 @@ static uint8_t snake_try_head_increment(uint8_t p_num) {
     uint8_t old_head_x = head_x = snakes[p_num].head_x;
     uint8_t old_head_y = head_y = snakes[p_num].head_y;
 
-    // Store final move_dir in current position
-    // (which will soon become previous position)
-    uint8_t board_player_data = snakes[p_num].dir | p_num; // TODO make a macro out of this
-    game_board[ BOARD_INDEX(head_x, head_y) ] = PLAYER_BITS_TO_BOARD(p_num);
+    // Store final move_dir in current head position (will soon become previous position)
+    // Use same value below at (possible) new head position
+    uint8_t board_bits_player_num_and_dir = PLAYER_AND_DIR_BITS_TO_BOARD(p_num);
+    game_board[ BOARD_INDEX(head_x, head_y) ] = board_bits_player_num_and_dir;
 
     // Increment head and handle screen edge wraparound
     switch (snakes[p_num].dir) {
@@ -382,7 +382,7 @@ static uint8_t snake_try_head_increment(uint8_t p_num) {
     if ((board_data_new & BOARD_EXCEPT_FOOD_MASK) == BOARD_CLEAR) {
 
         // Set new location with player and preliminary dir bits
-        *p_board_new = board_player_data;
+        *p_board_new = board_bits_player_num_and_dir;
 
         uint8_t body_tile_id = snake_calc_tile_body(p_num);
         uint8_t head_tile_id = snake_calc_tile_head(p_num);
