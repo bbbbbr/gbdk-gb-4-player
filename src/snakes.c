@@ -286,6 +286,9 @@ void snakes_reset_and_draw(void) {
             set_bkg_tile_xy(head_x, head_y + 1, snake_calc_tile_body(c));
             set_bkg_tile_xy(head_x, head_y + 2, snake_calc_tile_tail(c, snakes[c].dir));
         }
+        else {
+            snakes[c].is_alive = false;
+        }
         player_id_bit <<= 1;
     }
 }
@@ -478,6 +481,8 @@ static bool snake_handle_head_increment_result(uint8_t p_num, uint8_t try_move) 
         food_eaten_total++;
     }
     else {
+        // Implied: HEAD_INC_OK
+
         // No food eaten, snake stays same size
         snake_tail_increment(p_num);
     }
@@ -533,12 +538,7 @@ bool snakes_process_packet_input_and_tick_game(void) {
     // from one of the players (0..3)
     for (c = 0; c < _4P_XFER_RX_SZ; c++) {
 
-        bool is_your_player = (my_player_num == c);
-
-        if (IS_PLAYER_CONNECTED(player_id_bit)) {
-
-            // Skip players that have died
-            if (snakes[c].is_alive == false) continue;
+        if (IS_PLAYER_CONNECTED(player_id_bit) && (snakes[c].is_alive)) {
 
             // Check for player commands
             uint8_t value = _4p_rx_buf_READ_ptr[c];
@@ -557,8 +557,7 @@ bool snakes_process_packet_input_and_tick_game(void) {
 
             // Apply movement
             if ((game_tick & 0x0Fu) == 0u) {  // TODO: more granular movement, make a counter that resets and counts down
-
-                // Cache current dur as prev for calculating turns
+                // Cache current dir as prev for calculating turns
                 snakes[c].dir_prev = snakes[c].dir;
 
                 // Check for direction change request
