@@ -12,6 +12,7 @@
 #include "board_ui_fn.h"
 
 #include "snakes.h"
+#include "gameplay.h"
 
 
 uint8_t game_tick;
@@ -36,8 +37,8 @@ typedef struct {
 
 snake_t snakes[PLAYER_NUM_MAX];
 
+uint8_t snakes_player_count;
 uint8_t snakes_alive_count;
-uint8_t snakes_alive_count_prev;
 
 // Laid out as Rows, so: (y * BOARD_WIDTH) + x -> BOARD_INDEX(x,y)
 uint8_t game_board[BOARD_WIDTH * BOARD_HEIGHT];
@@ -117,7 +118,9 @@ static void snake_board_reset(void);
 static uint8_t snake_try_head_increment(uint8_t p_num);
 static void snake_tail_increment(uint8_t p_num);
 static void snake_length_increment_and_render(uint8_t p_num);
+static bool snake_died_check_gameover(void);
 static bool snake_handle_head_increment_result(uint8_t p_num, uint8_t try_move);
+static void snake_check_for_input(uint8_t p_num);
 
 static void rand_and_food_reset(void) {
     // TODO: food_spawned_min -> allow spawning more than 1 food at a time, and increase it over time? (by getting "+" spawns that maybe are timed to vanish)
@@ -291,12 +294,15 @@ void snakes_reset_and_draw(void) {
         }
         player_id_bit <<= 1;
     }
+
+    // Save number of players at start
+    snakes_player_count = snakes_alive_count;
 }
 
 
 // Render a snake as dead on the board
 // Filling it's tiles with skulls marked as collide-able
-void snakes_render_dead( uint8_t p_num) {
+void snake_render_dead( uint8_t p_num) {
 
     static bool  is_this_player;
     static uint8_t skull_icon;
@@ -448,6 +454,42 @@ static void snake_tail_increment(uint8_t p_num) {
 }
 
 
+// Called after a snake has collided with something and died
+//
+// Sets player game won/lost status if applicable, also flags game as ended
+static bool snake_died_check_gameover(void) {
+
+    // Single player mode ends when the snake dies
+    if (snakes_player_count == PLAYER_COUNT_SINGLE_PLAYER_MODE) {
+        // Single player mode gets a different message
+        GAMEPLAY_SET_THIS_PLAYER_STATUS(PLAYER_STATUS_GAME_OVER);
+        return true;  // Game Over
+    }
+    else {
+        // Multi-player mode game ends when only one player is alive
+        if (snakes_alive_count == 1u) {
+
+            // If this player is still alive, it was the last and it won.
+            // Otherwise all other players lost.
+            if (snakes[ WHICH_PLAYER_AM_I_ZERO_BASED() ].is_alive)
+                GAMEPLAY_SET_THIS_PLAYER_STATUS(PLAYER_STATUS_WON);
+            else
+                GAMEPLAY_SET_THIS_PLAYER_STATUS(PLAYER_STATUS_LOST);
+
+            return true;  // Game Over
+        }
+        else if (snakes_alive_count == 0u) {
+            // Or if all remaining players died in the same game tick -> special no-winners messsage
+            // Single player mode gets a different message
+            GAMEPLAY_SET_THIS_PLAYER_STATUS(PLAYER_STATUS_ALL_LOST);
+            return true;  // Game Over
+        }
+    }
+
+    return false; // Game DID NOT END
+}
+
+
 // Handle the result of a call to snake_try_head_increment()
 // Returns: FALSE if game is over
 static bool snake_handle_head_increment_result(uint8_t p_num, uint8_t try_move) {
@@ -456,24 +498,17 @@ static bool snake_handle_head_increment_result(uint8_t p_num, uint8_t try_move) 
 
         // Could do tail shrink and point loss when snakes collide
         snakes[p_num].is_alive = false;
-
         snakes_alive_count--;
-        snakes_render_dead(p_num);
+        snake_render_dead(p_num);
         board_ui_print_snake_size_dead(p_num);
 
-        if (snakes_alive_count == 0u) {
-            // There are now zero snakes alive, the game is over
-
-            // TODO: Handle case where two snakes collide head-on
-            // TODO: Handle single player game over versus (zero alive)
-            return false;
-        }
+        if (snake_died_check_gameover() == true)
+            return false; // Signal Game Over
     }
     else if (try_move == HEAD_INC_GROW_SNAKE) {
 
-        snake_length_increment_and_render(p_num);
-
         // Ate food, in order to grow the snake don't increment the tail
+        snake_length_increment_and_render(p_num);
         if (food_currently_spawned_count) food_currently_spawned_count--;
 
         // TODO: maybe if food is skull snake shrinks and loses total food eaten?
@@ -510,6 +545,25 @@ static void snake_length_increment_and_render(uint8_t p_num) {
 }
 
 
+// Check for input commands in the 4-Player RX buffer
+static void snake_check_for_input(uint8_t p_num) {
+
+    uint8_t value = _4p_rx_buf_READ_ptr[p_num];
+
+    // D-Pad input type command
+    if ((value & _SIO_CMD_MASK) == _SIO_CMD_DPAD) {
+
+        if (!rand_initialized) rand_update_seed();
+
+        // Save D-Pad button press for when the snake is next able to turn
+        // Block snake turning back onto itself
+        uint8_t dir_request = value & _SIO_DATA_MASK;
+        if (dir_request && (snakes[p_num].dir != dir_opposite[dir_request]))
+            snakes[p_num].dir_next = dir_request;
+    }
+}
+
+
 // In addition to processing input and events from the
 // data packets, this function also "ticks" the game.
 //
@@ -528,10 +582,7 @@ bool snakes_process_packet_input_and_tick_game(void) {
     // One game tick per 4 Player data packet
     game_tick++;
 
-    snakes_alive_count_prev = snakes_alive_count;
-
-    uint8_t my_player_num = WHICH_PLAYER_AM_I_ZERO_BASED();
-    uint8_t player_id_bit = _4P_PLAYER_1;
+    uint8_t player_id_bit = _4P_PLAYER_1;  // Start at lowest player bit
 
     // Loop through all bytes in the packet.
     // Each byte in the packet represents input/commands
@@ -541,21 +592,9 @@ bool snakes_process_packet_input_and_tick_game(void) {
         if (IS_PLAYER_CONNECTED(player_id_bit) && (snakes[c].is_alive)) {
 
             // Check for player commands
-            uint8_t value = _4p_rx_buf_READ_ptr[c];
+            snake_check_for_input(c);
 
-            // D-Pad input type command
-            if ((value & _SIO_CMD_MASK) == _SIO_CMD_DPAD) {
-
-                if (!rand_initialized) rand_update_seed();
-
-                // Save D-Pad button press for when the snake is next able to turn
-                // Block snake turning back onto itself
-                uint8_t dir_request = value & _SIO_DATA_MASK;
-                if (dir_request && (snakes[c].dir != dir_opposite[dir_request]))
-                    snakes[c].dir_next = dir_request;
-            }
-
-            // Apply movement
+            // Apply movement if it's a game update tick
             if ((game_tick & 0x0Fu) == 0u) {  // TODO: more granular movement, make a counter that resets and counts down
                 // Cache current dir as prev for calculating turns
                 snakes[c].dir_prev = snakes[c].dir;
@@ -566,9 +605,12 @@ bool snakes_process_packet_input_and_tick_game(void) {
                     snakes[c].dir_next = PLAYER_DIR_NONE;
                 }
 
-                uint8_t try_move = snake_try_head_increment(c);
-                if (snake_handle_head_increment_result(c, try_move) == false)
-                    return false;
+                // Try to move the snake, handle collisions and eating food (growing the snake)
+                // The game over player states get set here if applicable
+                uint8_t try_move     = snake_try_head_increment(c);
+                bool    game_is_over = (snake_handle_head_increment_result(c, try_move) == false);
+
+                if (game_is_over) return false;
             }
         }
 

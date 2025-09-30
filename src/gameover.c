@@ -9,16 +9,68 @@
 
 #include "gfx.h"
 #include "snakes.h"
+#include "gameplay.h"
+#include "print.h"
 
 
-void gameover_init(void) {
+const char str_you_lost[] =
+    " @@@@@@@@@@ \n"
+    "@ YOU LOST @\n"
+    " @@@@@@@@@@ " ;
 
-    set_bkg_based_tiles( ((DEVICE_SCREEN_PX_WIDTH - game_over_WIDTH) / game_over_TILE_W) / 2u,
-                         ((DEVICE_SCREEN_PX_HEIGHT - game_over_HEIGHT) / game_over_TILE_H) / 2u,
-                         (game_over_WIDTH / game_over_TILE_W),
-                         (game_over_HEIGHT / game_over_TILE_H),
-                         game_over_map, (uint8_t)GAME_OVER_TILES_START);
+const char str_you_won[] =
+    " +++++++++ \n"
+    "+ YOU WON +\n"
+    " +++++++++ " ;
 
+const char str_all_lost[] =
+    " @@@@@@@@@@@@ \n"
+    "@ NOBODY WON @\n"
+    " @@@@@@@@@@@@ " ;
+
+const char str_game_over[] =
+    " @@@@@@@@@@@ \n"
+    "@ GAME OVER @\n"
+    " @@@@@@@@@@@ " ;
+
+#define MSG_HEIGHT           3u
+#define MSG_LOST_WIDTH      12u  // Multi-player  mode
+#define MSG_WON_WIDTH       11u  // Multi-player  mode
+#define MSG_ALL_LOST_WIDTH  14u  // Multi-player  mode
+#define MSG_GAME_OVER_WIDTH 13u  // Single player mode
+
+#define MSG_Y           ((BOARD_HEIGHT - MSG_HEIGHT) / 2u)
+#define MSG_X_LOST      ((BOARD_WIDTH - MSG_LOST_WIDTH) / 2u)
+#define MSG_X_WON       ((BOARD_WIDTH - MSG_WON_WIDTH) / 2u)
+#define MSG_X_ALL_LOST  ((BOARD_WIDTH - MSG_ALL_LOST_WIDTH) / 2u)
+#define MSG_X_GAME_OVER ((BOARD_WIDTH - MSG_ALL_LOST_WIDTH) / 2u)
+
+
+
+void gameover_show_end_game_message(void) {
+
+    uint8_t x = 0u;
+    const char * str = "";
+
+    switch( GAMEPLAY_GET_THIS_PLAYER_STATUS() ) {
+        case PLAYER_STATUS_LOST: x = MSG_X_LOST;
+                                 str = str_you_lost;
+                                 break;
+
+        case PLAYER_STATUS_WON: x = MSG_X_WON;
+                                 str = str_you_won;
+                                 break;
+
+        case PLAYER_STATUS_ALL_LOST: x = MSG_X_ALL_LOST;
+                                 str = str_all_lost;
+                                 break;
+
+        case PLAYER_STATUS_GAME_OVER: x = MSG_X_GAME_OVER;
+                                 str = str_game_over;
+                                 break;
+    }
+    print_gotoxy(x, MSG_Y, PRINT_BKG);
+    print_str(str);
 
     hide_sprites_range(0, MAX_HARDWARE_SPRITES);
 }
@@ -67,7 +119,7 @@ static bool process_packets(void) {
         if (process_packet_check_button_press() == true)
             return false;
 
-        // Move to next packet RX Bytes                
+        // Move to next packet RX Bytes
         _4p_rx_buf_packet_increment_read_ptr();
     }
 
@@ -80,7 +132,7 @@ static bool process_packets(void) {
 
 void gameover_run(void){
 
-    gameover_init();
+    gameover_show_end_game_message();
 
     while (1) {
         UPDATE_KEYS();
@@ -144,7 +196,7 @@ void gameover_run(void){
         // _4p_connect_status = (_4P_PLAYER_1 | _4P_PLAYER_3) | PLAYER_1;
         _4p_connect_status = (_4P_PLAYER_1 | _4P_PLAYER_2 | _4P_PLAYER_3 | _4P_PLAYER_4) | PLAYER_1;
 
-        gameover_init();
+        gameover_show_end_game_message();
         _4p_mock_init_xfer_buffers();
 
         while (1) {
@@ -153,7 +205,7 @@ void gameover_run(void){
 
             if (IS_PLAYER_DATA_READY()) {
                 if (process_packets() == false) {
-                    // Handle exit Game Over screen                    
+                    // Handle exit Game Over screen
                     return;
                 }
             }

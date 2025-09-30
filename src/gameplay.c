@@ -9,11 +9,13 @@
 
 #include "gfx.h"
 #include "snakes.h"
+#include "gameplay.h"
 
 
 #define RX_BUF_INITIAL_PACKET_IGNORE_COUNT   4   // Number of initial packets to ignore, works for TX size of 1. May need research for larger values
 uint8_t rx_packet_ignore_count;
 
+uint8_t game_this_player_status;
 
 static void gameplay_init(void) {
 
@@ -33,9 +35,10 @@ static void gameplay_init(void) {
     fill_bkg_rect(0u, 0u, DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT, BLANK_TILE);
     set_bkg_based_tiles(BOARD_UI_X_START, BOARD_UI_Y_START, board_ui_WIDTH / board_ui_TILE_W, board_ui_HEIGHT / board_ui_TILE_H, board_ui_map, BOARD_UI_TILES_START);
 
-
     snakes_reset_and_draw();
     hide_sprites_range(0, MAX_HARDWARE_SPRITES);
+
+    GAMEPLAY_SET_THIS_PLAYER_STATUS(PLAYER_STATUS_INGAME);
 
     rx_packet_ignore_count = RX_BUF_INITIAL_PACKET_IGNORE_COUNT;
 }
