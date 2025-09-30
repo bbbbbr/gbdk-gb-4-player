@@ -130,6 +130,10 @@ clean:
 		$(MAKE) $$target-clean; \
 	done
 
+romusage:
+	# Ignores failure if romusage not in path
+	-romusage -g -sRp build/gb/$(PROJECTNAME).noi
+
 # Include available build targets
 include Makefile.targets
 
