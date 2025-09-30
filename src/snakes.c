@@ -500,7 +500,11 @@ static bool snake_handle_head_increment_result(uint8_t p_num, uint8_t try_move) 
         snakes[p_num].is_alive = false;
         snakes_alive_count--;
         snake_render_dead(p_num);
-        board_ui_print_snake_size_dead(p_num);
+
+        // Put X's over dead snake's length display
+        // (except when in single player mode, so it remains visible after single player game ended)
+        if (snakes_player_count != PLAYER_COUNT_SINGLE_PLAYER_MODE)
+            board_ui_print_snake_size_dead(p_num);
 
         if (snake_died_check_gameover() == true)
             return false; // Signal Game Over
