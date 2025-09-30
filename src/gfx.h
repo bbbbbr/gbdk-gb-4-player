@@ -7,6 +7,7 @@
 #include "checkbox.h"
 #include "font_nums.h"
 #include "font_nums_no_outline.h"
+#include "font_alpha.h"
 
 #include "you_arrow_spr.h"
 
@@ -14,14 +15,12 @@
 #include "board_tiles.h"
 #include "board_ui.h"
 
-#include "game_over.h"
-
 #define BG_TITLE_BG_TILES_START        0u
-#define BG_CHECKBOX_TILES_START        (BG_TITLE_BG_TILES_START + title_bg_TILE_COUNT)
+#define BG_CHECKBOX_TILES_START        (BG_TITLE_BG_TILES_START + (uint8_t)title_bg_TILE_COUNT)
     #define BG_CHECKBOX_TILE_UNCHECKED (BG_CHECKBOX_TILES_START + 0)
     #define BG_CHECKBOX_TILE_CHECKED   (BG_CHECKBOX_TILES_START + 1)
-#define BG_FONT_NUMS_TILES_START       (BG_CHECKBOX_TILES_START + checkbox_TILE_COUNT)
-    #define BG_FONT_X                  (16u)
+#define BG_FONT_NUMS_TILES_START       (BG_CHECKBOX_TILES_START + (uint8_t)checkbox_TILE_COUNT)
+    #define BG_FONT_X                  (10u)
 
 #define BLANK_TILE (BG_TITLE_BG_TILES_START)
 
@@ -72,12 +71,11 @@
     #define BOARD_TILE_SKULL_LITE    (BOARD_TILES_START + 1u)
     #define BOARD_TILE_SKULL_DARK    (BOARD_TILES_START + 2u)
 
-#define GAME_OVER_TILES_START       (BOARD_TILES_START + board_tiles_TILE_COUNT)
+#define BOARD_UI_TILES_START              (BOARD_TILES_START + (uint8_t)board_tiles_TILE_COUNT)
 
-#define BOARD_UI_TILES_START              (GAME_OVER_TILES_START + game_over_TILE_COUNT)
-
-#define BG_FONT_NUMS_NO_OUTLINE_TILES_START     (BOARD_UI_TILES_START + board_ui_TILE_COUNT)
-    #define BG_FONT_X_NO_OUTLINE                (16u)
+#define BG_FONT_NUMS_NO_OUTLINE_TILES_START     (BOARD_UI_TILES_START + (uint8_t)board_ui_TILE_COUNT)
+    #define BG_FONT_X_NO_OUTLINE                (10u)
+#define BG_FONT_ALPHA_TILES_START      (BG_FONT_NUMS_NO_OUTLINE_TILES_START + (uint8_t)font_nums_no_outline_TILE_COUNT)
 
 
 #endif // _GFX_H
