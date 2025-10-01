@@ -73,7 +73,7 @@
 #define HEAD_INC_GROW_SNAKE   1u
 #define HEAD_INC_OK           2u
 
-void snakes_reset_and_draw(void);
+void snakes_init_and_draw(void);
 // void snakes_reset(void);
 // void snakes_redraw_all(void);
 

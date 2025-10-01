@@ -244,7 +244,7 @@ static void snake_board_reset(void) {
 }
 
 
-void snakes_reset_and_draw(void) {
+void snakes_init_and_draw(void) {
 
     snakes_alive_count    = 0u; // Reset to zero, increment +1 for every connected player
     game_tick             = 0u;
@@ -260,8 +260,8 @@ void snakes_reset_and_draw(void) {
             snakes[c].is_alive = true;
 
             snakes[c].dir      = PLAYER_DIR_UP;
-            snakes[c].dir_next = PLAYER_DIR_UP;
             snakes[c].dir_next = PLAYER_DIR_NONE;
+            snakes[c].dir_prev = PLAYER_DIR_UP;
 
             // Have to set up and record the snake head/body/tail on the board before drawing
             uint8_t head_x = snakes[c].head_x = PLAYER_X_HEAD_START_STEP * (c + 1u);
@@ -285,7 +285,7 @@ void snakes_reset_and_draw(void) {
             board_ui_print_snake_size(c, snakes[c].size_digit_lo, snakes[c].size_digit_hi);
 
             // Now draw them
-            set_bkg_tile_xy(head_x, head_y,      snake_calc_tile_head(c));
+            set_bkg_tile_xy(head_x, head_y,     snake_calc_tile_head(c));
             set_bkg_tile_xy(head_x, head_y + 1, snake_calc_tile_body(c));
             set_bkg_tile_xy(head_x, head_y + 2, snake_calc_tile_tail(c, snakes[c].dir));
         }
