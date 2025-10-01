@@ -14,29 +14,29 @@
 
 
 const char str_you_lost[] =
-    " @@@@@@@@@@ \n"
-    "@ YOU LOST @\n"
-    " @@@@@@@@@@ " ;
+    " @ @ @ @ @ @ \n"
+    "@ YOU  LOST @\n"
+    " @ @ @ @ @ @ " ;
 
 const char str_you_won[] =
-    " +++++++++ \n"
+    " + + + + + \n"
     "+ YOU WON +\n"
-    " +++++++++ " ;
+    " + + + + + " ;
 
 const char str_all_lost[] =
-    " @@@@@@@@@@@@ \n"
-    "@ NOBODY WON @\n"
-    " @@@@@@@@@@@@ " ;
+    " @ @ @ @ @ @ @ \n"
+    "@ NOBODY  WON  @\n"
+    " @ @ @ @ @ @ @ " ;
 
 const char str_game_over[] =
-    " @@@@@@@@@@@ \n"
+    " @ @ @ @ @ @ \n"
     "@ GAME OVER @\n"
-    " @@@@@@@@@@@ " ;
+    " @ @ @ @ @ @ " ;
 
 #define MSG_HEIGHT           3u
-#define MSG_LOST_WIDTH      12u  // Multi-player  mode
+#define MSG_LOST_WIDTH      13u  // Multi-player  mode
 #define MSG_WON_WIDTH       11u  // Multi-player  mode
-#define MSG_ALL_LOST_WIDTH  14u  // Multi-player  mode
+#define MSG_ALL_LOST_WIDTH  15u  // Multi-player  mode
 #define MSG_GAME_OVER_WIDTH 13u  // Single player mode
 
 #define MSG_Y           ((BOARD_HEIGHT - MSG_HEIGHT) / 2u)
