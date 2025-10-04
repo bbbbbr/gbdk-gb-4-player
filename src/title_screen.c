@@ -10,15 +10,15 @@
 #include "gfx.h"
 
 
-#define CHECKBOX_ROW 12u
+#define CHECKBOX_ROW 14u
 const uint8_t checkbox_col[] = {3u, 7u, 12u, 16u};
 
-#define YOU_SPR_Y  (118u + DEVICE_SPRITE_PX_OFFSET_Y)
+#define YOU_SPR_Y  (131u + DEVICE_SPRITE_PX_OFFSET_Y)
 const uint8_t you_spr_x[] = {
-    24u  + (uint8_t)DEVICE_SPRITE_PX_OFFSET_X,
-    56u  + (uint8_t)DEVICE_SPRITE_PX_OFFSET_X,
-    90u  + (uint8_t)DEVICE_SPRITE_PX_OFFSET_X,
-    124u + (uint8_t)DEVICE_SPRITE_PX_OFFSET_X
+    (8u *  3u) + (uint8_t)DEVICE_SPRITE_PX_OFFSET_X,
+    (8u *  7u) + (uint8_t)DEVICE_SPRITE_PX_OFFSET_X,
+    (8u * 12u) + (uint8_t)DEVICE_SPRITE_PX_OFFSET_X,
+    (8u * 16u) + (uint8_t)DEVICE_SPRITE_PX_OFFSET_X,
 };
 
 
@@ -31,18 +31,8 @@ void title_screen_init(void) {
 
     set_bkg_data((uint8_t)BG_CHECKBOX_TILES_START, checkbox_TILE_COUNT, checkbox_tiles);
 
-    set_bkg_data((uint8_t)BG_FONT_NUMS_TILES_START, font_nums_TILE_COUNT, font_nums_tiles);
-    set_bkg_data((uint8_t)BG_FONT_NUMS_NO_OUTLINE_TILES_START, font_nums_no_outline_TILE_COUNT, font_nums_no_outline_tiles);
-
-    set_bkg_data((uint8_t)BG_FONT_ALPHA_TILES_START, font_alpha_TILE_COUNT, font_alpha_tiles);
 
     set_sprite_data(SPR_YOU_ARROW_SPR_TILES_START, you_arrow_spr_TILE_COUNT, you_arrow_spr_tiles);
-
-    // Game BG Tiles
-    set_sprite_data(SNAKE_TILES_START, snake_tiles_TILE_COUNT, snake_tiles_tiles);
-    set_sprite_data(BOARD_TILES_START, board_tiles_TILE_COUNT, board_tiles_tiles);
-    
-    set_sprite_data(BOARD_UI_TILES_START, board_ui_TILE_COUNT, board_ui_tiles);
 
     hide_sprites_range(0, MAX_HARDWARE_SPRITES);
 }
