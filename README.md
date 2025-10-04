@@ -1,5 +1,4 @@
 # Example using the Game Boy Four Player Adapter (DMG-07) in C/GBDK-2020.
-
 Status:
 - 4-player adapter: Protocol implemented and entirely working. Code in src: [4_player_adapter.c](src/4_player_adapter.c) and [4_player_adapter.h](src/4_player_adapter.h)
 - Gameplay: Basic example of multi-player snake (1-4 players)
@@ -16,6 +15,12 @@ In this game the approach to solve potential synchronization issues across four 
 As a result of this, for the most part, consoles do not broadcast events to each other aside from button inputs. Instead if a player dies on one console, it is essentially guaranteed (as long as there is no packet loss) that the player dies in the same exact manner/location/game timing on all the other consoles.
 
 This approach will not be suitable for all games- however the example hardware interface code is agnostic to how games are implemented.
+
+
+# Issues with powered-off GBAs
+When GBA-SP (and possibly original GBA) model Game Boys are connected to the DMG-07 Four Player adapter but have their power turned off **and** a cart inserted, they will interfere with the Transmission mode (forcing a return to Ping mode).
+
+So, when those models are powered-off, make sure to disconnect them from the Four Player adapter.
 
 
 # Bare ISR vector vs GBDK ISR dispatcher
