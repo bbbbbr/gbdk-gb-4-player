@@ -11,6 +11,15 @@
 
 #define PLAYER_COUNT_SINGLE_PLAYER_MODE  1u
 
+// Loading tile and map data at start of gameplay takes about 6 frames,
+// so ignore that many packets plus a few more as wiggle room.
+//
+// This is to avoid dumping serial packet data in an uncontrolled way
+// if the RX buffer goes too long without being serviced. The alternate
+// is to make the RX packet buffer deeper (RX_BUF_NUM_PACKETS), but that
+// uses more memory.
+#define RX_BUF_INITIAL_PACKET_IGNORE_COUNT   8u
+
 void gameplay_run(void);
 static void gameplay_init(void);
 

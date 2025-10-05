@@ -45,6 +45,8 @@ void main(void){
 
             gameover_run_local_only();
         #else
+            four_player_set_packet_discard_count(RX_BUF_INITIAL_PACKET_IGNORE_COUNT);
+
             title_screen_run();
 
             gameplay_run();

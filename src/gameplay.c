@@ -12,24 +12,24 @@
 #include "gameplay.h"
 
 
-#define RX_BUF_INITIAL_PACKET_IGNORE_COUNT   4   // Number of initial packets to ignore, works for TX size of 1. May need research for larger values
-uint8_t rx_packet_ignore_count;
+// #define RX_BUF_INITIAL_PACKET_IGNORE_COUNT   4   // Number of initial packets to ignore, works for TX size of 1
+// uint8_t rx_packet_ignore_count;
 
 uint8_t game_this_player_status;
 
 static void gameplay_init(void) {
 
-    // // Load map and tiles
-    // set_bkg_data(BG_TITLE_BG_TILES_START, title_bg_TILE_COUNT, title_bg_tiles);
-    // set_bkg_tiles(0,0, (title_bg_WIDTH / title_bg_TILE_W),
-    //                    (title_bg_HEIGHT / title_bg_TILE_H), title_bg_map);
+    // At least 6 frames
 
-    // set_bkg_data((uint8_t)BG_CHECKBOX_TILES_START, checkbox_TILE_COUNT, checkbox_tiles);
-    // set_bkg_data((uint8_t)BG_FONT_NUMS_TILES_START, font_nums_TILE_COUNT, font_nums_tiles);
+    // Load map and tiles
+    set_sprite_data(SNAKE_TILES_START, snake_tiles_TILE_COUNT, snake_tiles_tiles);
+    set_sprite_data(BOARD_TILES_START, board_tiles_TILE_COUNT, board_tiles_tiles);
 
-    // set_sprite_data(SPR_YOU_ARROW_SPR_TILES_START, you_arrow_spr_TILE_COUNT, you_arrow_spr_tiles);
-    // set_sprite_data(SPR_SNAKE_TILES_START, snake_tiles_spr_TILE_COUNT, snake_tiles_spr_tiles);
-    // hide_sprites_range(0, MAX_HARDWARE_SPRITES);
+    set_sprite_data(BOARD_UI_TILES_START, board_ui_TILE_COUNT, board_ui_tiles);
+
+    set_bkg_data((uint8_t)BG_FONT_NUMS_TILES_START, font_nums_TILE_COUNT, font_nums_tiles);
+    set_bkg_data((uint8_t)BG_FONT_NUMS_NO_OUTLINE_TILES_START, font_nums_no_outline_TILE_COUNT, font_nums_no_outline_tiles);
+    set_bkg_data((uint8_t)BG_FONT_ALPHA_TILES_START, font_alpha_TILE_COUNT, font_alpha_tiles);
 
     // Cover title screen info
     fill_bkg_rect(0u, 0u, DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT, BLANK_TILE);
@@ -40,7 +40,7 @@ static void gameplay_init(void) {
 
     GAMEPLAY_SET_THIS_PLAYER_STATUS(PLAYER_STATUS_INGAME);
 
-    rx_packet_ignore_count = RX_BUF_INITIAL_PACKET_IGNORE_COUNT;
+    // rx_packet_ignore_count = RX_BUF_INITIAL_PACKET_IGNORE_COUNT;
 }
 
 
@@ -55,17 +55,17 @@ static bool process_packets(void) {
 
     for (uint8_t packet = 0; packet < packets_ready; packet++) {
 
-        // Skip initial packets if requested
-        if (rx_packet_ignore_count)
-            rx_packet_ignore_count--;
-        else {
+        // // Skip initial packets if requested
+        // if (rx_packet_ignore_count)
+        //     rx_packet_ignore_count--;
+        // else {
             if (snakes_process_packet_input_and_tick_game() == false) {
                 #ifdef DISPLAY_USE_SIO_DATA_DURATION_IN_BGP
                     BGP_REG = ~BGP_REG;
                 #endif
                 return false;
             }
-        }
+        // }
 
         // Move to next packet RX Bytes                
         _4p_rx_buf_packet_increment_read_ptr();
