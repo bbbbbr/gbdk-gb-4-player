@@ -120,7 +120,12 @@ static void snake_tail_increment(uint8_t p_num);
 static void snake_length_increment_and_render(uint8_t p_num);
 static bool snake_died_check_gameover(void);
 static bool snake_handle_head_increment_result(uint8_t p_num, uint8_t try_move);
-static void snake_check_for_input(uint8_t p_num);
+static bool snake_check_for_input(uint8_t p_num);
+
+
+#ifdef DEBUG_RENDER_GAME_TICK
+    static void debug_print_tick_count(uint8_t tick);
+#endif
 
 static void rand_and_food_reset(void) {
     // TODO: food_spawned_min -> allow spawning more than 1 food at a time, and increase it over time? (by getting "+" spawns that maybe are timed to vanish)
@@ -550,7 +555,7 @@ static void snake_length_increment_and_render(uint8_t p_num) {
 
 
 // Check for input commands in the 4-Player RX buffer
-static void snake_check_for_input(uint8_t p_num) {
+static bool snake_check_for_input(uint8_t p_num) {
 
     uint8_t value = _4p_rx_buf_READ_ptr[p_num];
 
@@ -564,7 +569,11 @@ static void snake_check_for_input(uint8_t p_num) {
         uint8_t dir_request = value & _SIO_DATA_MASK;
         if (dir_request && (snakes[p_num].dir != dir_opposite[dir_request]))
             snakes[p_num].dir_next = dir_request;
+
+        return true;
     }
+
+    return false;
 }
 
 
@@ -595,8 +604,13 @@ bool snakes_process_packet_input_and_tick_game(void) {
 
         if (IS_PLAYER_CONNECTED(player_id_bit) && (snakes[c].is_alive)) {
 
-            // Check for player commands
-            snake_check_for_input(c);
+            #ifdef DEBUG_RENDER_GAME_TICK
+                // Check for player commands
+                if (snake_check_for_input(c))
+                    debug_print_tick_count(game_tick);
+            #else
+                snake_check_for_input(c);
+            #endif
 
             // Apply movement if it's a game update tick
             if ((game_tick & 0x0Fu) == 0u) {  // TODO: more granular movement, make a counter that resets and counts down
@@ -633,3 +647,28 @@ bool snakes_process_packet_input_and_tick_game(void) {
     return true;
 }
 
+
+#ifdef DEBUG_RENDER_GAME_TICK
+    // Render a given snake's length to the UI region at the bottom of the screen
+    void debug_print_tick_count(uint8_t tick) {
+
+        // Use outlined font if the update is for this player, otherwise non-outlined font
+        uint8_t p_num = WHICH_PLAYER_AM_I_ZERO_BASED();
+
+        uint8_t digit_hi = tick >> 4;
+        uint8_t digit_lo = tick & 0x0Fu;
+
+        if (digit_hi <= 9u) digit_hi += BG_FONT_NUMS_TILES_START;
+        else               digit_hi += BG_FONT_ALPHA_TILES_START - 10u;
+
+        if (digit_lo <= 9u) digit_lo += BG_FONT_NUMS_TILES_START;
+        else               digit_lo += BG_FONT_ALPHA_TILES_START - 10u;
+
+
+        // Print the Left digit
+        uint8_t * p_vram = set_bkg_tile_xy(0x01u, BOARD_UI_PRINT_Y, digit_hi);
+        // Move to next tile and print the right digit (X increments, Y stays the same)
+        p_vram++;
+        set_vram_byte(p_vram, digit_lo);
+    }
+#endif
