@@ -79,6 +79,11 @@ void snakes_init_and_draw(void);
 
 bool snakes_process_packet_input_and_tick_game(void);
 
+#ifdef DEBUG_RENDER_GAME_TICK
+    void debug_print_tick_count(uint8_t p_num, uint8_t tick);
+    void debug_print_checksum(void);
+#endif
+
 #endif // _SNAKES_H
 
 

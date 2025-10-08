@@ -43,6 +43,7 @@ static void gameplay_init(void) {
     // rx_packet_ignore_count = RX_BUF_INITIAL_PACKET_IGNORE_COUNT;
 }
 
+uint16_t sio_checksum;
 
 static bool process_packets(void) {
 
@@ -54,6 +55,8 @@ static bool process_packets(void) {
     uint8_t packets_ready = four_player_rx_buf_get_num_packets_ready();
 
     for (uint8_t packet = 0; packet < packets_ready; packet++) {
+
+sio_checksum++;
 
         // // Skip initial packets if requested
         // if (rx_packet_ignore_count)
@@ -69,6 +72,11 @@ static bool process_packets(void) {
 
         // Move to next packet RX Bytes                
         _4p_rx_buf_packet_increment_read_ptr();
+
+        #ifdef DEBUG_RENDER_GAME_TICK
+            if (_4p_rx_overflowed_bytes_count != 0u)
+                debug_print_tick_count(8u, _4p_rx_overflowed_bytes_count);
+        #endif
     }
 
     // free up the rx buf space now that it's done being used
@@ -85,6 +93,7 @@ static bool process_packets(void) {
 void gameplay_run(void){
 
     gameplay_init();
+    sio_checksum = 0u;
 
     while (1) {
         UPDATE_KEYS();

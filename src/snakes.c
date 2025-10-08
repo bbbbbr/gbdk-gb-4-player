@@ -51,6 +51,9 @@ uint8_t  rand_seed_1;
 bool     rand_initialized;
 
 
+// DEBUG
+bool input_found;
+
 // TODO: change for individual bits for directions so this and other things can be more compact
 // Lookup to prevent snake from turning back on top of itself
 const uint8_t dir_opposite[] = {
@@ -122,10 +125,6 @@ static bool snake_died_check_gameover(void);
 static bool snake_handle_head_increment_result(uint8_t p_num, uint8_t try_move);
 static bool snake_check_for_input(uint8_t p_num);
 
-
-#ifdef DEBUG_RENDER_GAME_TICK
-    static void debug_print_tick_count(uint8_t tick);
-#endif
 
 static void rand_and_food_reset(void) {
     // TODO: food_spawned_min -> allow spawning more than 1 food at a time, and increase it over time? (by getting "+" spawns that maybe are timed to vanish)
@@ -250,6 +249,9 @@ static void snake_board_reset(void) {
 
 
 void snakes_init_and_draw(void) {
+
+    // Debug
+    input_found = false;
 
     snakes_alive_count    = 0u; // Reset to zero, increment +1 for every connected player
     game_tick             = 0u;
@@ -589,6 +591,9 @@ static bool snake_check_for_input(uint8_t p_num) {
 // so that it appears on each console at the same exact time
 // and in the same exact order.
 //
+extern uint16_t sio_checksum;
+extern uint16_t _4p_sio_packet_checksum;
+
 bool snakes_process_packet_input_and_tick_game(void) {
     static uint8_t c;
 
@@ -597,20 +602,36 @@ bool snakes_process_packet_input_and_tick_game(void) {
 
     uint8_t player_id_bit = _4P_PLAYER_1;  // Start at lowest player bit
 
+
+    // ===== DEBUG
+    bool this_tick_input_found = false;
+    for (c = 0u; c < _4P_XFER_RX_SZ; c++) {
+        uint8_t value = _4p_rx_buf_READ_ptr[c];
+        // D-Pad input type command
+        if ((value & _SIO_CMD_MASK) == _SIO_CMD_DPAD) {
+            debug_print_tick_count(c, game_tick);
+            this_tick_input_found = true;
+            input_found = true;
+        }
+        sio_checksum += value;
+    }
+    if (this_tick_input_found) {
+        debug_print_tick_count(4u, (uint8_t)((sio_checksum >> 8) & 0xFFu));
+        debug_print_tick_count(5u, (uint8_t)(sio_checksum & 0xFFu));
+        debug_print_tick_count(6u, (uint8_t)((_4p_sio_packet_checksum >> 8) & 0xFFu));
+        debug_print_tick_count(7u, (uint8_t)(_4p_sio_packet_checksum & 0xFFu));
+    }
+    // =====
+
+
     // Loop through all bytes in the packet.
     // Each byte in the packet represents input/commands
     // from one of the players (0..3)
-    for (c = 0; c < _4P_XFER_RX_SZ; c++) {
+    for (c = 0u; c < _4P_XFER_RX_SZ; c++) {
 
         if (IS_PLAYER_CONNECTED(player_id_bit) && (snakes[c].is_alive)) {
 
-            #ifdef DEBUG_RENDER_GAME_TICK
-                // Check for player commands
-                if (snake_check_for_input(c))
-                    debug_print_tick_count(game_tick);
-            #else
-                snake_check_for_input(c);
-            #endif
+            snake_check_for_input(c);
 
             // Apply movement if it's a game update tick
             if ((game_tick & 0x0Fu) == 0u) {  // TODO: more granular movement, make a counter that resets and counts down
@@ -619,22 +640,31 @@ bool snakes_process_packet_input_and_tick_game(void) {
 
                 // Check for direction change request
                 if (snakes[c].dir_next) {
+
+                    // debug_print_tick_count(c, game_tick);
+
                     snakes[c].dir      = snakes[c].dir_next;
                     snakes[c].dir_next = PLAYER_DIR_NONE;
                 }
 
-                // Try to move the snake, handle collisions and eating food (growing the snake)
-                // The game over player states get set here if applicable
-                uint8_t try_move     = snake_try_head_increment(c);
-                bool    game_is_over = (snake_handle_head_increment_result(c, try_move) == false);
+                if (input_found) {
+                    // Try to move the snake, handle collisions and eating food (growing the snake)
+                    // The game over player states get set here if applicable
+                    uint8_t try_move     = snake_try_head_increment(c);
+                    bool    game_is_over = (snake_handle_head_increment_result(c, try_move) == false);
 
-                if (game_is_over) return false;
+                    if (game_is_over) return false;
+                }
             }
         }
 
         // Move to next snake
         player_id_bit <<= 1;
     }
+
+    // Debug - flush queued input now that it has been used
+    if ((game_tick & 0x0Fu) == 0u)
+        input_found = false;
 
     // Only spawn food when there is none
     if (food_currently_spawned_count == FOOD_SPAWNED_NONE) {
@@ -649,11 +679,22 @@ bool snakes_process_packet_input_and_tick_game(void) {
 
 
 #ifdef DEBUG_RENDER_GAME_TICK
-    // Render a given snake's length to the UI region at the bottom of the screen
-    void debug_print_tick_count(uint8_t tick) {
 
-        // Use outlined font if the update is for this player, otherwise non-outlined font
-        uint8_t p_num = WHICH_PLAYER_AM_I_ZERO_BASED();
+static const uint8_t ui_print_x[] = {
+    BOARD_UI_PRINT_X_P1,
+    BOARD_UI_PRINT_X_P2,
+    BOARD_UI_PRINT_X_P3,
+    BOARD_UI_PRINT_X_P4,
+    0u,  // 4u
+    2u,
+    16u,
+    18u,
+    6u,
+};
+
+
+    // Render a given snake's length to the UI region at the bottom of the screen
+    void debug_print_tick_count(uint8_t p_num, uint8_t tick) {
 
         uint8_t digit_hi = tick >> 4;
         uint8_t digit_lo = tick & 0x0Fu;
@@ -666,7 +707,7 @@ bool snakes_process_packet_input_and_tick_game(void) {
 
 
         // Print the Left digit
-        uint8_t * p_vram = set_bkg_tile_xy(0x01u, BOARD_UI_PRINT_Y, digit_hi);
+        uint8_t * p_vram = set_bkg_tile_xy(ui_print_x[p_num], BOARD_UI_PRINT_Y - 1u, digit_hi);
         // Move to next tile and print the right digit (X increments, Y stays the same)
         p_vram++;
         set_vram_byte(p_vram, digit_lo);

@@ -43,10 +43,11 @@ uint8_t   _4p_rx_buf_count;               // Number of bytes currently in SIO RX
 const uint8_t * _4p_rx_buf_end_wrap_addr = RX_BUF_PTR_END_WRAP_ADDR;                          // Used by Main for pointer wraparound
 
 uint8_t _4p_rx_packets_to_discard;        // How many packets remain to be discarded (as requested by main program)
+uint8_t _4p_rx_overflowed_bytes_count;
 
 uint8_t sio_keepalive;               // Monitor SIO rx count to detect disconnects
 
-
+uint16_t _4p_sio_packet_checksum;
 
 // =================== State change functions ===================
 
@@ -60,7 +61,10 @@ inline void four_player_reset_to_ping_no_critical(void) {
     _4p_switchmode_cmd_rx_count = _4P_START_XFER_COUNT_RESET;
     sio_keepalive               = SIO_KEEPALIVE_RESET;
     _4p_request_switch_to_xfer_mode = false;
-    _4p_rx_packets_to_discard   = 0u;
+
+    _4p_rx_packets_to_discard     = 0u;
+    _4p_rx_overflowed_bytes_count = 0u;
+    _4p_sio_packet_checksum       = 0u;
 }
 
 
@@ -325,9 +329,13 @@ static void sio_handle_mode_xfer(uint8_t sio_byte) {
         if (_4p_rx_packets_to_discard == NO_PACKETS_TO_DISARD) {
             // byte count increment and pointer wraparound are done below
             *_4p_rx_buf_WRITE_ptr++ = sio_byte;
+            _4p_sio_packet_checksum += sio_byte;
         }
     }
-    // else TODO: OPTIONAL: could count dropped bytes here
+    else {
+        if (_4p_rx_overflowed_bytes_count != 255u)
+            _4p_rx_overflowed_bytes_count++;
+    }
 
     _4p_xfer_count++;
     // Check for completion of RX state, if so return to initial TX state
@@ -347,6 +355,8 @@ static void sio_handle_mode_xfer(uint8_t sio_byte) {
             _4p_rx_buf_count += RX_BUF_PACKET_SZ;
             if (_4p_rx_buf_WRITE_ptr == RX_BUF_PTR_END_WRAP_ADDR)
                 _4p_rx_buf_WRITE_ptr = _4p_rx_buf;
+
+            _4p_sio_packet_checksum++;
         }
 
         // Now ready if trying to switch back to ping mode which seems to

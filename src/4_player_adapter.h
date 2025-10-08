@@ -166,7 +166,7 @@ enum {
 
     // Buffer sizing for Transmission(Xfer) mode
     #define RX_BUF_PACKET_SZ      (_4P_XFER_RX_SZ)   // Size in bytes of total RX transfer (i.e TX Size x 4 Players)
-    #define RX_BUF_NUM_PACKETS    3                  // Buffering capacity for up to N RX packets
+    #define RX_BUF_NUM_PACKETS    6                  // Buffering capacity for up to N RX packets
     #define RX_BUF_SZ             (RX_BUF_PACKET_SZ * RX_BUF_NUM_PACKETS)
 
 #if (RX_BUF_SZ  > 256)
@@ -256,8 +256,7 @@ extern uint8_t * _4p_rx_buf_READ_ptr;
 extern uint8_t   _4p_rx_buf_count;
 extern const uint8_t * _4p_rx_buf_end_wrap_addr;
 
-extern uint8_t packet_counter;
-extern uint8_t sio_counter;
+extern uint8_t _4p_rx_overflowed_bytes_count;
 
 // PLAYER_ID_BIT should be one of _4P_PLAYER_1/2/3/4
 #define IS_PLAYER_CONNECTED(PLAYER_ID_BIT)  (_4p_connect_status & PLAYER_ID_BIT)
