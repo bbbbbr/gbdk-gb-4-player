@@ -24,6 +24,8 @@
     #define ENABLE_SIO_KEEPALIVE
 #endif
 
+// #define ENABLE_HAZARD_SPAWN
+
 // Buttons are downshifted here since they are transmitted in
 // the lower 4 bits via the _SIO_CMD_BUTTONS packet type
 #define BUTTON_START   ((J_START) >> 4)

@@ -161,10 +161,18 @@ static void food_spawn_single_in_center(void) {
 }
 
 
+// Spawn a new food item (or skull hazard if build-enabled)
+//
+// TODO: In theory a player could tirelessly grow the snake
+//       to be almost the entire board with only 1-2 tiles free.
+//       In that case a couple things would need to happen:
+//       1. This lookup would become unreasonably slow and would a board-free LUT
+//       2. The loop below would become endless and the game would freeze
+//       
+//       Probably nobody will ever play to that extent so we won't accommodate it
 static void food_spawn_new(void) {
     // TODO: Food eaten counter with "Win" threshold so this doesn't have to deal with an extremely cluttered board what would make this inefficient and possibly unbeatable
 
-    food_currently_spawned_count++;
 
     // Start with one food pellet in the middle
     // Upshift by 1 to increase range
@@ -173,6 +181,8 @@ static void food_spawn_new(void) {
     uint8_t spawn_x = FAST_RAND_MODULO_8(BOARD_WIDTH);
     uint8_t spawn_y = FAST_RAND_MODULO_8(BOARD_HEIGHT);
 
+
+    // Try to find a blank tile on the board to spawn
     uint8_t * p_board = game_board + BOARD_INDEX(spawn_x, spawn_y);
     while( *p_board != BLANK_TILE) {
         // Wrap around to the start if the end is reached
@@ -192,8 +202,22 @@ static void food_spawn_new(void) {
         }
     }
 
-    *p_board = BOARD_FOOD_BIT;
-    set_bkg_tile_xy(spawn_x, spawn_y, BOARD_TILE_HEART);
+    #ifdef ENABLE_HAZARD_SPAWN
+        // TODO: This needs additional protection to not spawn
+        //       a skull right in front of a player. Could spawn at tails (when eating food?)
+        // 1 in N chance the spawned item is a Skull hazard
+        if ((rand() & HAZARD_SPAWN_MASK) == HAZARD_SPAWN_VALUE) {
+            // Collision set and showing a Skull tile. NO food spawn increment
+            *p_board = BOARD_COLLISION_BIT;
+            set_bkg_tile_xy(spawn_x, spawn_y, BOARD_TILE_SKULL_LITE);
+        } else {
+    #endif
+        *p_board = BOARD_FOOD_BIT;
+        set_bkg_tile_xy(spawn_x, spawn_y, BOARD_TILE_HEART);
+        food_currently_spawned_count++;
+    #ifdef ENABLE_HAZARD_SPAWN
+        }
+    #endif
  }
 
 
@@ -698,9 +722,9 @@ bool snakes_process_packet_input_and_tick_game(void) {
         #endif
 
         // Only spawn food when there is none
-        if (food_currently_spawned_count == FOOD_SPAWNED_NONE) {
+        if (food_currently_spawned_count < FOOD_SPAWNED_MAX) {
             if (food_spawn_timer == FOOD_TIMER_COUNT_DONE) {
-                if (rand_initialized) food_spawn_new();
+                if (rand_initialized) food_spawn_new();  // Also resets spawn timer
             }
             else food_spawn_timer--;
         }

@@ -59,11 +59,14 @@
 #define BOARD_PLAYER_BITS       0x03u  // 0 .. 3
 #define BOARD_EXCEPT_FOOD_MASK (BOARD_TAIL_DIR_BITS | BOARD_COLLISION_BIT | BOARD_PLAYER_BITS)
 
-#define FOOD_SPAWNED_NONE          0u       // Change to SPAWNED_MAX for Up to N foods on board
+#define FOOD_SPAWNED_NONE          0u
+#define FOOD_SPAWNED_MAX           4u  // Max number of food that can be on the board at a time
 #define FOOD_TIMER_COUNT_DONE      0u
 #define FOOD_SPAWN_TIMER_MIN     (60u * 2u)  // 2 seconds Min
 #define FOOD_SPAWN_TIMER_RANGE   0xFFu // 256, which is about 4 seconds - to avoid more expensive modulo calc// (60u * 5u)  // 0-5 seconds range
 
+#define HAZARD_SPAWN_VALUE       0x00u  // Spawn a hazard if the random roll returns this value
+#define HAZARD_SPAWN_MASK        0x07u  // 1 in 7 chance of spawning a hazard instead of food
 
 #define DIR_BITS_FROM_BOARD(board_byte)     (board_byte >> 4)
 // #define DIR_BITS_TO_BOARD(dir)           ((dir & BOARD_TAIL_DIR_BITS) >> 4)
