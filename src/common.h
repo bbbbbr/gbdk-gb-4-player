@@ -24,7 +24,7 @@
     #define ENABLE_SIO_KEEPALIVE
 #endif
 
-// #define ENABLE_HAZARD_SPAWN
+#define ENABLE_SPAWN_HAZARD_AFTER_EATING
 
 // Buttons are downshifted here since they are transmitted in
 // the lower 4 bits via the _SIO_CMD_BUTTONS packet type

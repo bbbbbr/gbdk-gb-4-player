@@ -33,6 +33,10 @@ typedef struct {
     uint8_t size_digit_lo; // Lower digit 0-9
 
     bool is_alive;
+
+    #ifdef ENABLE_SPAWN_HAZARD_AFTER_EATING
+    uint8_t spawn_hazard_next_move;
+    #endif
 } snake_t;
 
 snake_t snakes[PLAYER_NUM_MAX];
@@ -161,7 +165,7 @@ static void food_spawn_single_in_center(void) {
 }
 
 
-// Spawn a new food item (or skull hazard if build-enabled)
+// Spawn a new food item
 //
 // TODO: In theory a player could tirelessly grow the snake
 //       to be almost the entire board with only 1-2 tiles free.
@@ -202,22 +206,9 @@ static void food_spawn_new(void) {
         }
     }
 
-    #ifdef ENABLE_HAZARD_SPAWN
-        // TODO: This needs additional protection to not spawn
-        //       a skull right in front of a player. Could spawn at tails (when eating food?)
-        // 1 in N chance the spawned item is a Skull hazard
-        if ((rand() & HAZARD_SPAWN_MASK) == HAZARD_SPAWN_VALUE) {
-            // Collision set and showing a Skull tile. NO food spawn increment
-            *p_board = BOARD_COLLISION_BIT;
-            set_bkg_tile_xy(spawn_x, spawn_y, BOARD_TILE_SKULL_LITE);
-        } else {
-    #endif
-        *p_board = BOARD_FOOD_BIT;
-        set_bkg_tile_xy(spawn_x, spawn_y, BOARD_TILE_HEART);
-        food_currently_spawned_count++;
-    #ifdef ENABLE_HAZARD_SPAWN
-        }
-    #endif
+    *p_board = BOARD_FOOD_BIT;
+    set_bkg_tile_xy(spawn_x, spawn_y, BOARD_TILE_HEART);
+    food_currently_spawned_count++;
  }
 
 
@@ -295,6 +286,9 @@ void snakes_init_and_draw(void) {
 
             snakes_alive_count++;
             snakes[c].is_alive = true;
+            #ifdef ENABLE_SPAWN_HAZARD_AFTER_EATING
+            snakes[c].spawn_hazard_next_move = 0u;
+            #endif
 
             snakes[c].dir      = PLAYER_DIR_UP;
             snakes[c].dir_next = PLAYER_DIR_NONE;
@@ -462,8 +456,21 @@ static void snake_tail_increment(uint8_t p_num) {
     uint8_t * p_board = game_board + BOARD_INDEX(tail_x, tail_y);
     uint8_t board_tail_data = *p_board;
 
-    // Clear board at current (soon to be former) tail position
-    *p_board = BOARD_CLEAR;
+    #ifdef ENABLE_SPAWN_HAZARD_AFTER_EATING
+        // Spawn a collision and Skull tile at snake tail if it ate last move
+        if (snakes[p_num].spawn_hazard_next_move) {
+            *p_board = BOARD_COLLISION_BIT;
+            set_bkg_tile_xy(old_tail_x, old_tail_y, BOARD_TILE_SKULL_LITE);
+            snakes[p_num].spawn_hazard_next_move--;
+        }
+        else {
+    #endif
+        // Clear board at current (soon to be former) tail position
+        *p_board = BOARD_CLEAR;
+        set_bkg_tile_xy(old_tail_x, old_tail_y, BLANK_TILE);
+    #ifdef ENABLE_SPAWN_HAZARD_AFTER_EATING
+        }
+    #endif
 
     // Retrieve dir of tail from board
     // Increment tail and handle wraparound
@@ -487,7 +494,6 @@ static void snake_tail_increment(uint8_t p_num) {
     snakes[p_num].tail_y = tail_y;
 
     set_bkg_tile_xy(tail_x, tail_y, snake_calc_tile_tail(p_num, DIR_BITS_FROM_BOARD( game_board[ BOARD_INDEX(tail_x, tail_y) ] )) );
-    set_bkg_tile_xy(old_tail_x, old_tail_y, BLANK_TILE);
 }
 
 
@@ -551,6 +557,9 @@ static bool snake_handle_head_increment_result(uint8_t p_num, uint8_t try_move) 
         // Ate food, in order to grow the snake don't increment the tail
         snake_length_increment_and_render(p_num);
         if (food_currently_spawned_count) food_currently_spawned_count--;
+        #ifdef ENABLE_SPAWN_HAZARD_AFTER_EATING
+            snakes[p_num].spawn_hazard_next_move++;
+        #endif
 
         // TODO: maybe if food is skull snake shrinks and loses total food eaten?
         // TODO: implement/display total food eaten as score/etc
