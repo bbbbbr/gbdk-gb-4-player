@@ -11,9 +11,11 @@
 
 
 #define CHECKBOX_ROW 14u
+// Checkbox positions for players 1 - 4
 const uint8_t checkbox_col[] = {3u, 7u, 12u, 16u};
 
 #define YOU_SPR_Y  (131u + DEVICE_SPRITE_PX_OFFSET_Y)
+// Sprite arrow positions for players 1 - 4
 const uint8_t you_spr_x[] = {
     (8u *  3u) + (uint8_t)DEVICE_SPRITE_PX_OFFSET_X,
     (8u *  7u) + (uint8_t)DEVICE_SPRITE_PX_OFFSET_X,
@@ -35,6 +37,7 @@ void title_screen_init(void) {
     set_sprite_data(SPR_YOU_ARROW_SPR_TILES_START, you_arrow_spr_TILE_COUNT, you_arrow_spr_tiles);
 
     hide_sprites_range(0, MAX_HARDWARE_SPRITES);
+    SHOW_SPRITES;
 }
 
 

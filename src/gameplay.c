@@ -32,8 +32,15 @@ static void gameplay_init(void) {
     fill_bkg_rect(0u, 0u, DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT, BLANK_TILE);
     set_bkg_based_tiles(BOARD_UI_X_START, BOARD_UI_Y_START, board_ui_WIDTH / board_ui_TILE_W, board_ui_HEIGHT / board_ui_TILE_H, board_ui_map, BOARD_UI_TILES_START);
 
+    // Set up "Paused" sprites - they won't be displayed until later when needed (via hiding/showing ALL sprites)
+    HIDE_SPRITES;
+    hide_sprites_range(0, MAX_HARDWARE_SPRITES);    
+    set_sprite_data(SPR_PAUSED_SPR_TILES_START, paused_spr_TILE_COUNT, paused_spr_tiles);    
+    move_metasprite(paused_spr_metasprites[0], SPR_PAUSED_SPR_TILES_START,
+                    0u, (uint8_t)PAUSED_SPR_X, (uint8_t)PAUSED_SPR_Y);
+
     snakes_init_and_draw();
-    hide_sprites_range(0, MAX_HARDWARE_SPRITES);
+
 
     GAMEPLAY_SET_THIS_PLAYER_STATUS(PLAYER_STATUS_INGAME);
 }
@@ -104,9 +111,13 @@ void gameplay_run(void){
 
         // Load D-Pad TX data for next frame
         // Only send data when there is a discrete event
-        uint8_t dpad_ticked = GET_KEYS_TICKED(J_DPAD);
+        uint8_t dpad_ticked    = GET_KEYS_TICKED(J_DPAD);
+        uint8_t buttons_ticked = GET_KEYS_TICKED(J_BUTTONS) >> 4;
         if (dpad_ticked != 0u) {
             four_player_set_xfer_data(_SIO_CMD_DPAD | dpad_ticked);
+        }
+        else if (GET_KEYS_TICKED(J_START)) {
+            four_player_set_xfer_data(_SIO_CMD_BUTTONS | buttons_ticked);
         }
 
 
@@ -174,10 +185,16 @@ void gameplay_run(void){
             // Load D-Pad TX data for next frame
             // Only send data when there is a discrete event
 
-            uint8_t dpad_ticked = GET_KEYS_TICKED(J_DPAD);
+            // Load D-Pad TX data for next frame
+            // Only send data when there is a discrete event
+            uint8_t dpad_ticked    = GET_KEYS_TICKED(J_DPAD);
+            uint8_t buttons_ticked = GET_KEYS_TICKED(J_BUTTONS) >> 4;
             if (dpad_ticked != 0u) {
                 four_player_set_xfer_data(_SIO_CMD_DPAD | dpad_ticked);
-            } 
+            }
+            else if (GET_KEYS_TICKED(J_START)) {
+                four_player_set_xfer_data(_SIO_CMD_BUTTONS | buttons_ticked);
+            }
             else {
                 // clear tx data, this would normally be done in the serial ISR as it transmitted
                 _4P_xfer_tx_data = 0x00;

@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define ARRAY_LEN(A)  sizeof(A) / sizeof(A[0])
+#define ARRAY_LEN(A)  (sizeof(A) / sizeof(A[0]))
 
 #define FAST_RAND_MODULO_8(range_size)   ( (uint8_t) ( ((uint16_t)rand() * range_size) >> 8 ))
 
@@ -22,6 +22,12 @@
     #define ENABLE_SIO_KEEPALIVE
 #endif
 
+// Buttons are downshifted here since they are transmitted in
+// the lower 4 bits via the _SIO_CMD_BUTTONS packet type
+#define BUTTON_START   ((J_START) >> 4)
+#define BUTTON_SELECT  ((J_SELECT) >> 4)
+#define BUTTON_A       ((J_A) >> 4)
+#define BUTTON_B       ((J_B) >> 4)
 
 
 // GB Sound macros

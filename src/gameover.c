@@ -148,7 +148,7 @@ void gameover_run(void){
 
         // Load button ticked TX data for next frame
         // Only send data when there is a discrete event
-        uint8_t buttons_ticked = (GET_KEYS_TICKED(J_START | J_A | J_B | J_SELECT)) >> 4;
+        uint8_t buttons_ticked = GET_KEYS_TICKED(J_BUTTONS) >> 4;
         if (buttons_ticked != 0u) {
             four_player_set_xfer_data(_SIO_CMD_BUTTONS | buttons_ticked);
         }
@@ -212,7 +212,7 @@ void gameover_run(void){
 
             // Load button ticked TX data for next frame
             // Only send data when there is a discrete event
-            uint8_t buttons_ticked = (GET_KEYS_TICKED(J_START | J_A | J_B | J_SELECT)) >> 4;
+            uint8_t buttons_ticked = GET_KEYS_TICKED(J_BUTTONS) >> 4;
             if (buttons_ticked != 0u) {
                 four_player_set_xfer_data(_SIO_CMD_BUTTONS | buttons_ticked);
             }

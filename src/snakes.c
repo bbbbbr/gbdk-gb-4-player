@@ -50,9 +50,12 @@ uint8_t  food_eaten_total;
 uint8_t  rand_seed_1;
 bool     rand_initialized;
 
+bool     game_toggle_pause_requested;
+bool     game_is_paused;
 
-// DEBUG
-bool input_found;
+#ifdef DEBUG_SINGLE_STEP
+    bool input_found;
+#endif
 
 // TODO: change for individual bits for directions so this and other things can be more compact
 // Lookup to prevent snake from turning back on top of itself
@@ -251,15 +254,18 @@ static void snake_board_reset(void) {
 void snakes_init_and_draw(void) {
 
     // Debug
-    input_found = false;
+    #ifdef DEBUG_SINGLE_STEP
+        input_found = false;
+    #endif
 
     snakes_alive_count    = 0u; // Reset to zero, increment +1 for every connected player
     game_tick             = 0u;
     game_tick_speed       = GAME_TICK_SPEED_START;
-    uint8_t player_id_bit = _4P_PLAYER_1;
+    game_is_paused        = false;
 
     snake_board_reset();
 
+    uint8_t player_id_bit = _4P_PLAYER_1;
     for (uint8_t c = 0u; c < PLAYER_NUM_MAX; c++) {
         if (IS_PLAYER_CONNECTED(player_id_bit)) {
 
@@ -559,20 +565,26 @@ static void snake_length_increment_and_render(uint8_t p_num) {
 // Check for input commands in the 4-Player RX buffer
 static bool snake_check_for_input(uint8_t p_num) {
 
-    uint8_t value = _4p_rx_buf_READ_ptr[p_num];
+    uint8_t value   = _4p_rx_buf_READ_ptr[p_num];
+    uint8_t cmd     =  value & _SIO_CMD_MASK;
+    uint8_t payload =  value & _SIO_DATA_MASK;
 
     // D-Pad input type command
-    if ((value & _SIO_CMD_MASK) == _SIO_CMD_DPAD) {
+    if (cmd == _SIO_CMD_DPAD) {
 
         if (!rand_initialized) rand_update_seed();
 
         // Save D-Pad button press for when the snake is next able to turn
         // Block snake turning back onto itself
-        uint8_t dir_request = value & _SIO_DATA_MASK;
+        uint8_t dir_request = payload;
         if (dir_request && (snakes[p_num].dir != dir_opposite[dir_request]))
             snakes[p_num].dir_next = dir_request;
 
         return true;
+    }
+    else if (cmd == _SIO_CMD_BUTTONS) {
+        if (payload == BUTTON_START)
+            game_toggle_pause_requested = true;
     }
 
     return false;
@@ -601,6 +613,7 @@ bool snakes_process_packet_input_and_tick_game(void) {
 
     // One game tick per 4 Player data packet
     game_tick++;
+    game_toggle_pause_requested = false;
 
     uint8_t player_id_bit = _4P_PLAYER_1;  // Start at lowest player bit
 
@@ -638,30 +651,33 @@ bool snakes_process_packet_input_and_tick_game(void) {
 
             snake_check_for_input(c);
 
-            // Apply movement if it's a game update tick
-            if ((game_tick & 0x0Fu) == 0u) {  // TODO: more granular movement, make a counter that resets and counts down
-                // Cache current dir as prev for calculating turns
-                snakes[c].dir_prev = snakes[c].dir;
+            if (game_is_paused == false) {
 
-                // Check for direction change request
-                if (snakes[c].dir_next) {
+                // Apply movement if it's a game update tick
+                if ((game_tick & 0x0Fu) == 0u) {  // TODO: more granular movement, make a counter that resets and counts down
+                    // Cache current dir as prev for calculating turns
+                    snakes[c].dir_prev = snakes[c].dir;
 
-                    snakes[c].dir      = snakes[c].dir_next;
-                    snakes[c].dir_next = PLAYER_DIR_NONE;
+                    // Check for direction change request
+                    if (snakes[c].dir_next) {
+
+                        snakes[c].dir      = snakes[c].dir_next;
+                        snakes[c].dir_next = PLAYER_DIR_NONE;
+                    }
+
+                    #ifdef DEBUG_SINGLE_STEP
+                    if (input_found) {
+                    #endif
+                        // Try to move the snake, handle collisions and eating food (growing the snake)
+                        // The game over player states get set here if applicable
+                        uint8_t try_move     = snake_try_head_increment(c);
+                        bool    game_is_over = (snake_handle_head_increment_result(c, try_move) == false);
+
+                        if (game_is_over) return false;
+                    #ifdef DEBUG_SINGLE_STEP
+                    }
+                    #endif
                 }
-
-                #ifdef DEBUG_SINGLE_STEP
-                if (input_found) {
-                #endif
-                    // Try to move the snake, handle collisions and eating food (growing the snake)
-                    // The game over player states get set here if applicable
-                    uint8_t try_move     = snake_try_head_increment(c);
-                    bool    game_is_over = (snake_handle_head_increment_result(c, try_move) == false);
-
-                    if (game_is_over) return false;
-                #ifdef DEBUG_SINGLE_STEP
-                }
-                #endif
             }
         }
 
@@ -669,18 +685,32 @@ bool snakes_process_packet_input_and_tick_game(void) {
         player_id_bit <<= 1;
     }
 
-    #ifdef DEBUG_SINGLE_STEP
-    // Debug - flush queued input now that it has been used
-    if ((game_tick & 0x0Fu) == 0u)
-        input_found = false;
-    #endif
+    if (game_is_paused == false) {
+        #ifdef DEBUG_SINGLE_STEP
+        // Debug - flush queued input now that it has been used
+        if ((game_tick & 0x0Fu) == 0u)
+            input_found = false;
+        #endif
 
-    // Only spawn food when there is none
-    if (food_currently_spawned_count == FOOD_SPAWNED_NONE) {
-        if (food_spawn_timer == FOOD_TIMER_COUNT_DONE) {
-            if (rand_initialized) food_spawn_new();
+        // Only spawn food when there is none
+        if (food_currently_spawned_count == FOOD_SPAWNED_NONE) {
+            if (food_spawn_timer == FOOD_TIMER_COUNT_DONE) {
+                if (rand_initialized) food_spawn_new();
+            }
+            else food_spawn_timer--;
         }
-        else food_spawn_timer--;
+    }
+
+    // Handle pause toggle requests at the end so that multiple players
+    // pressing pause at the same time doesn't cause the pause request
+    // to be negated. Instead they are aggregated into a single request
+    if (game_toggle_pause_requested) {
+        // Invert pause state
+        game_is_paused = !game_is_paused;
+
+        // Add or remove the pause indicator, done by toggling ALL sprites on/off
+        if (game_is_paused)  SHOW_SPRITES;
+        else                 HIDE_SPRITES;
     }
 
     return true;

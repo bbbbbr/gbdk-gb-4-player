@@ -15,6 +15,9 @@
 #include "board_tiles.h"
 #include "board_ui.h"
 
+#include "paused_spr.h"
+
+
 #define BG_TITLE_BG_TILES_START        0u
 #define BG_CHECKBOX_TILES_START        (BG_TITLE_BG_TILES_START + (uint8_t)title_bg_TILE_COUNT)
     #define BG_CHECKBOX_TILE_UNCHECKED (BG_CHECKBOX_TILES_START + 0)
@@ -24,6 +27,7 @@
 
 
 #define SPR_YOU_ARROW_SPR_TILES_START  0u
+#define SPR_PAUSED_SPR_TILES_START     0u
 
 
 // Tile shared between sprites and BKG
@@ -78,6 +82,11 @@
     #define BG_FONT_X                  (10u)
 
 #define BG_FONT_ALPHA_TILES_START      (BG_FONT_NUMS_TILES_START + (uint8_t)font_nums_TILE_COUNT)
+
+
+// Center the pause sprite message on the game board
+#define PAUSED_SPR_Y        (((DEVICE_SCREEN_PX_HEIGHT - 16u - paused_spr_HEIGHT) / 2u) + DEVICE_SPRITE_PX_OFFSET_Y)
+#define PAUSED_SPR_X        (((DEVICE_SCREEN_PX_WIDTH - paused_spr_WIDTH) / 2u) + DEVICE_SPRITE_PX_OFFSET_X)
 
 
 #endif // _GFX_H
