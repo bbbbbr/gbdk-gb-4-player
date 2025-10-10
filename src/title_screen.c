@@ -88,14 +88,10 @@ void title_screen_run(void){
         update_connection_display();
 
         if (KEY_TICKED(J_START)) {
-            if (WHICH_PLAYER_AM_I() == PLAYER_1) {
+            // Any player can start the game
+            // if (WHICH_PLAYER_AM_I() == PLAYER_1) {
                 four_player_request_change_to_xfer_mode();
-            }
-        }
-        else if (KEY_TICKED(J_SELECT)) {
-            // Try to change mode even if this console isn't Player 1
-            // (allowed, but probably not recommended)
-            four_player_request_change_to_xfer_mode();
+            //}
         }
     }
 }
