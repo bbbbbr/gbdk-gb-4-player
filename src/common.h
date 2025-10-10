@@ -16,7 +16,9 @@
 
 // #define DEBUG_SINGLE_STEP
     // #define DEBUG_SHOW_CHECKSUM  // This requires on single-step to be enabled
-                                 // The checksum ONLY counts accepted bytes and packets that have been received
+                                   // The checksum ONLY counts accepted bytes and packets that have been received
+
+#define DEBUG_B_BUTTON_TO_REQUEST_PING_MODE
 
 #ifndef DEBUG_LOCAL_SINGLE_PLAYER_ONLY
     #define ENABLE_SIO_KEEPALIVE

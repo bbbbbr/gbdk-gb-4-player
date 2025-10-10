@@ -120,10 +120,11 @@ void gameplay_run(void){
             four_player_set_xfer_data(_SIO_CMD_BUTTONS | buttons_ticked);
         }
 
-
-        if (KEY_TICKED(J_B)) {
-            four_player_request_change_to_ping_mode();
-        }
+        #ifdef DEBUG_B_BUTTON_TO_REQUEST_PING_MODE
+            if (KEY_TICKED(J_B)) {
+                four_player_request_change_to_ping_mode();
+            }
+        #endif
     }
 }
 
