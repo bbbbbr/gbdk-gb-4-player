@@ -57,9 +57,9 @@ bool     game_is_paused;
     bool input_found;
 #endif
 
-// TODO: change for individual bits for directions so this and other things can be more compact
 // Lookup to prevent snake from turning back on top of itself
-const uint8_t dir_opposite[] = {
+// The PLAYER_DIR_NONE entries are used to block/filter out diagonal D-Pad input
+const uint8_t dir_opposite_LUT[] = {
     PLAYER_DIR_NONE,
     PLAYER_DIR_LEFT,  // 0x01  J_RIGHT
     PLAYER_DIR_RIGHT, // 0x02  J_LEFT
@@ -575,12 +575,17 @@ static bool snake_check_for_input(uint8_t p_num) {
         if (!rand_initialized) rand_update_seed();
 
         // Save D-Pad button press for when the snake is next able to turn
-        // Block snake turning back onto itself
         uint8_t dir_request = payload;
-        if (dir_request && (snakes[p_num].dir != dir_opposite[dir_request]))
-            snakes[p_num].dir_next = dir_request;
+        uint8_t dir_opposite = dir_opposite_LUT[dir_request];
 
-        return true;
+        // Filter out diagonals (they are marked as PLAYER_DIR_NONE in the LUT)
+        if (dir_opposite != PLAYER_DIR_NONE) {
+            // Block snake turning back onto itself
+            if (dir_request && (snakes[p_num].dir != dir_opposite)) {
+                snakes[p_num].dir_next = dir_request;
+                return true;
+            }
+        }
     }
     else if (cmd == _SIO_CMD_BUTTONS) {
         if (payload == BUTTON_START)
