@@ -18,7 +18,7 @@
 // if the RX buffer goes too long without being serviced. The alternate
 // is to make the RX packet buffer deeper (RX_BUF_NUM_PACKETS), but that
 // uses more memory.
-#define RX_BUF_INITIAL_PACKET_IGNORE_COUNT   8u
+#define FOUR_PLAYER_INITIAL_RX_PACKET_DISCARD_COUNT   8u
 
 void gameplay_run(void);
 static void gameplay_init(void);

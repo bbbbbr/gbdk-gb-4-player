@@ -7,9 +7,11 @@
 // or if it needs to be installed via add_SIO()
 // The bare vector is faster, but cannot be installed
 #define FOUR_PLAYER_BARE_ISR_VECTOR
+#define FOUR_PLAYER_BARE_ISR_SAFE_VRAM_EXIT
 
 #define SIO_KEEPALIVE_RESET   60u
 #define SIO_KEEPALIVE_TIMEOUT 0u
+
 
 // Console TX SIZE: controls how many bytes are sent from each console. 
 // - Min: 1 -> x 4 = 4  byte total Packer Size
@@ -19,8 +21,12 @@
 //   with a SIZE of 5, so 4 may be the functional maximum
 //
 // TODO: OPTIONAL: make size runtime configurable
-#define _4P_XFER_SZ 1u // Use 1 Byte as total data size in Transmission(Xfer) mode
-// #define _4P_XFER_SZ   // 1u // 2u // 3u // 4u
+
+#define _4P_XFER_SZ 1u           // Send N Bytes per Player in Transmission(Xfer) mode
+                                 // Valid values: 1u, 2u, 3u, 4u
+                                 // Resulting total RX transfer from DMG-07 will be 4 Players x _4P_XFER_SZ
+
+#define RX_BUF_NUM_PACKETS  8u   // Buffering capacity for up to N RX packets
 
 // ALSO ADJUSTABLE: RX_BUF_NUM_PACKETS for controlling how many packets the rx buffer can hold
 
@@ -41,7 +47,7 @@
 //
 //   - The RATE change applies __immediately__ upon next Ping packet
 //     - Value Range
-//       - Use Lower Nibble to: Set min possible packet time (i.e. delay between packets)
+//       - Use Lower Nibble to: Set min possible ` time (i.e. delay between packets)
 //
 //       - Interval Between Packets      = (12.2 msec) + ((RATE & 0x0F) * 1 msec)
 //         - Range: 12.2 msec -> 27.21 msec
@@ -166,7 +172,6 @@ enum {
 
     // Buffer sizing for Transmission(Xfer) mode
     #define RX_BUF_PACKET_SZ      (_4P_XFER_RX_SZ)   // Size in bytes of total RX transfer (i.e TX Size x 4 Players)
-    #define RX_BUF_NUM_PACKETS    6                  // Buffering capacity for up to N RX packets
     #define RX_BUF_SZ             (RX_BUF_PACKET_SZ * RX_BUF_NUM_PACKETS)
 
 #if (RX_BUF_SZ  > 256)

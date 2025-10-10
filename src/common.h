@@ -9,12 +9,14 @@
 #define FAST_RAND_MODULO_8(range_size)   ( (uint8_t) ( ((uint16_t)rand() * range_size) >> 8 ))
 
 
-#define DISPLAY_SIO_ISR_DURATION_IN_BGP
-#define DISPLAY_USE_SIO_DATA_DURATION_IN_BGP
+// #define DISPLAY_SIO_ISR_DURATION_IN_BGP
+// #define DISPLAY_USE_SIO_DATA_DURATION_IN_BGP
 
 // #define DEBUG_LOCAL_SINGLE_PLAYER_ONLY
 
-#define DEBUG_RENDER_GAME_TICK
+// #define DEBUG_SINGLE_STEP
+    // #define DEBUG_SHOW_CHECKSUM  // This requires on single-step to be enabled
+                                 // The checksum ONLY counts accepted bytes and packets that have been received
 
 #ifndef DEBUG_LOCAL_SINGLE_PLAYER_ONLY
     #define ENABLE_SIO_KEEPALIVE

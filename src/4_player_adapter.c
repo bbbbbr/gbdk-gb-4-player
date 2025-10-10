@@ -47,7 +47,9 @@ uint8_t _4p_rx_overflowed_bytes_count;
 
 uint8_t sio_keepalive;               // Monitor SIO rx count to detect disconnects
 
+#ifdef DEBUG_SHOW_CHECKSUM
 uint16_t _4p_sio_packet_checksum;
+#endif
 
 // =================== State change functions ===================
 
@@ -64,7 +66,9 @@ inline void four_player_reset_to_ping_no_critical(void) {
 
     _4p_rx_packets_to_discard     = 0u;
     _4p_rx_overflowed_bytes_count = 0u;
+    #ifdef DEBUG_SHOW_CHECKSUM
     _4p_sio_packet_checksum       = 0u;
+    #endif
 }
 
 
@@ -329,7 +333,10 @@ static void sio_handle_mode_xfer(uint8_t sio_byte) {
         if (_4p_rx_packets_to_discard == NO_PACKETS_TO_DISARD) {
             // byte count increment and pointer wraparound are done below
             *_4p_rx_buf_WRITE_ptr++ = sio_byte;
-            _4p_sio_packet_checksum += sio_byte;
+            #ifdef DEBUG_SHOW_CHECKSUM
+                // Add any accepted packet byte to naive checksum
+                _4p_sio_packet_checksum += sio_byte;
+            #endif
         }
     }
     else {
@@ -356,7 +363,10 @@ static void sio_handle_mode_xfer(uint8_t sio_byte) {
             if (_4p_rx_buf_WRITE_ptr == RX_BUF_PTR_END_WRAP_ADDR)
                 _4p_rx_buf_WRITE_ptr = _4p_rx_buf;
 
-            _4p_sio_packet_checksum++;
+            #ifdef DEBUG_SHOW_CHECKSUM
+                // Add any accepted packet as a single increment to naive checksum
+                _4p_sio_packet_checksum++;
+            #endif
         }
 
         // Now ready if trying to switch back to ping mode which seems to

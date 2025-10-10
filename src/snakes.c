@@ -591,8 +591,10 @@ static bool snake_check_for_input(uint8_t p_num) {
 // so that it appears on each console at the same exact time
 // and in the same exact order.
 //
-extern uint16_t sio_checksum;
-extern uint16_t _4p_sio_packet_checksum;
+#ifdef DEBUG_SHOW_CHECKSUM
+    extern uint16_t sio_checksum;
+    extern uint16_t _4p_sio_packet_checksum;
+#endif
 
 bool snakes_process_packet_input_and_tick_game(void) {
     static uint8_t c;
@@ -603,26 +605,29 @@ bool snakes_process_packet_input_and_tick_game(void) {
     uint8_t player_id_bit = _4P_PLAYER_1;  // Start at lowest player bit
 
 
-    // ===== DEBUG
-    bool this_tick_input_found = false;
-    for (c = 0u; c < _4P_XFER_RX_SZ; c++) {
-        uint8_t value = _4p_rx_buf_READ_ptr[c];
-        // D-Pad input type command
-        if ((value & _SIO_CMD_MASK) == _SIO_CMD_DPAD) {
-            debug_print_tick_count(c, game_tick);
-            this_tick_input_found = true;
-            input_found = true;
+    #ifdef DEBUG_SINGLE_STEP
+        bool this_tick_input_found = false;
+        for (c = 0u; c < _4P_XFER_RX_SZ; c++) {
+            uint8_t value = _4p_rx_buf_READ_ptr[c];
+            // D-Pad input type command
+            if ((value & _SIO_CMD_MASK) == _SIO_CMD_DPAD) {
+                // debug_print_info(c, game_tick);
+                this_tick_input_found = true;
+                input_found = true;
+            }
+            #ifdef DEBUG_SHOW_CHECKSUM
+            sio_checksum += value;
+            #endif
         }
-        sio_checksum += value;
-    }
-    if (this_tick_input_found) {
-        debug_print_tick_count(4u, (uint8_t)((sio_checksum >> 8) & 0xFFu));
-        debug_print_tick_count(5u, (uint8_t)(sio_checksum & 0xFFu));
-        debug_print_tick_count(6u, (uint8_t)((_4p_sio_packet_checksum >> 8) & 0xFFu));
-        debug_print_tick_count(7u, (uint8_t)(_4p_sio_packet_checksum & 0xFFu));
-    }
-    // =====
-
+        #ifdef DEBUG_SHOW_CHECKSUM
+            if (this_tick_input_found) {
+                debug_print_info(4u, (uint8_t)((sio_checksum >> 8) & 0xFFu));
+                debug_print_info(5u, (uint8_t)(sio_checksum & 0xFFu));
+                debug_print_info(6u, (uint8_t)((_4p_sio_packet_checksum >> 8) & 0xFFu));
+                debug_print_info(7u, (uint8_t)(_4p_sio_packet_checksum & 0xFFu));
+            }
+        #endif
+    #endif
 
     // Loop through all bytes in the packet.
     // Each byte in the packet represents input/commands
@@ -641,20 +646,22 @@ bool snakes_process_packet_input_and_tick_game(void) {
                 // Check for direction change request
                 if (snakes[c].dir_next) {
 
-                    // debug_print_tick_count(c, game_tick);
-
                     snakes[c].dir      = snakes[c].dir_next;
                     snakes[c].dir_next = PLAYER_DIR_NONE;
                 }
 
+                #ifdef DEBUG_SINGLE_STEP
                 if (input_found) {
+                #endif
                     // Try to move the snake, handle collisions and eating food (growing the snake)
                     // The game over player states get set here if applicable
                     uint8_t try_move     = snake_try_head_increment(c);
                     bool    game_is_over = (snake_handle_head_increment_result(c, try_move) == false);
 
                     if (game_is_over) return false;
+                #ifdef DEBUG_SINGLE_STEP
                 }
+                #endif
             }
         }
 
@@ -662,9 +669,11 @@ bool snakes_process_packet_input_and_tick_game(void) {
         player_id_bit <<= 1;
     }
 
+    #ifdef DEBUG_SINGLE_STEP
     // Debug - flush queued input now that it has been used
     if ((game_tick & 0x0Fu) == 0u)
         input_found = false;
+    #endif
 
     // Only spawn food when there is none
     if (food_currently_spawned_count == FOOD_SPAWNED_NONE) {
@@ -678,7 +687,7 @@ bool snakes_process_packet_input_and_tick_game(void) {
 }
 
 
-#ifdef DEBUG_RENDER_GAME_TICK
+#ifdef DEBUG_SINGLE_STEP
 
 static const uint8_t ui_print_x[] = {
     BOARD_UI_PRINT_X_P1,
@@ -694,7 +703,7 @@ static const uint8_t ui_print_x[] = {
 
 
     // Render a given snake's length to the UI region at the bottom of the screen
-    void debug_print_tick_count(uint8_t p_num, uint8_t tick) {
+    void debug_print_info(uint8_t p_num, uint8_t tick) {
 
         uint8_t digit_hi = tick >> 4;
         uint8_t digit_lo = tick & 0x0Fu;

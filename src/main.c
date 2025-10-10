@@ -45,7 +45,10 @@ void main(void){
 
             gameover_run_local_only();
         #else
-            four_player_set_packet_discard_count(RX_BUF_INITIAL_PACKET_IGNORE_COUNT);
+            // Drop initial packets during vram setup and the first few packets
+            // sent by the DMG-07 adapter which may have random data mixed in
+            // This only applies in Transmission mode
+            four_player_set_packet_discard_count(FOUR_PLAYER_INITIAL_RX_PACKET_DISCARD_COUNT);
 
             title_screen_run();
 

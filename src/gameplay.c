@@ -12,14 +12,11 @@
 #include "gameplay.h"
 
 
-// #define RX_BUF_INITIAL_PACKET_IGNORE_COUNT   4   // Number of initial packets to ignore, works for TX size of 1
-// uint8_t rx_packet_ignore_count;
-
 uint8_t game_this_player_status;
 
 static void gameplay_init(void) {
 
-    // At least 6 frames
+    // Takes at least 6 frames with screen on
 
     // Load map and tiles
     set_sprite_data(SNAKE_TILES_START, snake_tiles_TILE_COUNT, snake_tiles_tiles);
@@ -39,11 +36,12 @@ static void gameplay_init(void) {
     hide_sprites_range(0, MAX_HARDWARE_SPRITES);
 
     GAMEPLAY_SET_THIS_PLAYER_STATUS(PLAYER_STATUS_INGAME);
-
-    // rx_packet_ignore_count = RX_BUF_INITIAL_PACKET_IGNORE_COUNT;
 }
 
-uint16_t sio_checksum;
+
+#ifdef DEBUG_SHOW_CHECKSUM
+    uint16_t sio_checksum;
+#endif
 
 static bool process_packets(void) {
 
@@ -56,27 +54,19 @@ static bool process_packets(void) {
 
     for (uint8_t packet = 0; packet < packets_ready; packet++) {
 
-sio_checksum++;
+        #ifdef DEBUG_SHOW_CHECKSUM
+            sio_checksum++;
+        #endif
 
-        // // Skip initial packets if requested
-        // if (rx_packet_ignore_count)
-        //     rx_packet_ignore_count--;
-        // else {
-            if (snakes_process_packet_input_and_tick_game() == false) {
-                #ifdef DISPLAY_USE_SIO_DATA_DURATION_IN_BGP
-                    BGP_REG = ~BGP_REG;
-                #endif
-                return false;
-            }
-        // }
+        if (snakes_process_packet_input_and_tick_game() == false) {
+            #ifdef DISPLAY_USE_SIO_DATA_DURATION_IN_BGP
+                BGP_REG = ~BGP_REG;
+            #endif
+            return false;
+        }
 
         // Move to next packet RX Bytes                
         _4p_rx_buf_packet_increment_read_ptr();
-
-        #ifdef DEBUG_RENDER_GAME_TICK
-            if (_4p_rx_overflowed_bytes_count != 0u)
-                debug_print_tick_count(8u, _4p_rx_overflowed_bytes_count);
-        #endif
     }
 
     // free up the rx buf space now that it's done being used
@@ -93,7 +83,9 @@ sio_checksum++;
 void gameplay_run(void){
 
     gameplay_init();
-    sio_checksum = 0u;
+    #ifdef DEBUG_SHOW_CHECKSUM
+        sio_checksum = 0u;
+    #endif
 
     while (1) {
         UPDATE_KEYS();
