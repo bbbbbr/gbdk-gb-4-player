@@ -180,7 +180,7 @@ static void food_spawn_new(void) {
 
     // Start with one food pellet in the middle
     // Upshift by 1 to increase range
-    food_spawn_timer = ((uint16_t)FAST_RAND_MODULO_8(FOOD_SPAWN_TIMER_RANGE) << 1)+ FOOD_SPAWN_TIMER_MIN;
+    food_spawn_timer = (uint16_t)FAST_RAND_MODULO_8(FOOD_SPAWN_TIMER_RANGE) + FOOD_SPAWN_TIMER_MIN;
 
     uint8_t spawn_x = FAST_RAND_MODULO_8(BOARD_WIDTH);
     uint8_t spawn_y = FAST_RAND_MODULO_8(BOARD_HEIGHT);
