@@ -152,6 +152,12 @@ void gameover_run(void){
         if (buttons_ticked != 0u) {
             four_player_set_xfer_data(_SIO_CMD_BUTTONS | buttons_ticked);
         }
+
+        // If mode is still Transfer than the game ended normally
+        // but if it is now Ping mode then the game may have aborted
+        // anomalously. In that case skip the game over screen.
+        if (GET_CURRENT_MODE() == _4P_STATE_PING)
+            return;
     }
 }
 
