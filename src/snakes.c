@@ -598,7 +598,7 @@ static void snake_length_increment_and_render(uint8_t p_num) {
 // Check for input commands in the 4-Player RX buffer
 static bool snake_check_for_input(uint8_t p_num) {
 
-    uint8_t value   = _4p_rx_buf_READ_ptr[p_num];
+    uint8_t value   = _4p_rx_fifo_READ_ptr[p_num];
     uint8_t cmd     =  value & _SIO_CMD_MASK;
     uint8_t payload =  value & _SIO_DATA_MASK;
 
@@ -659,7 +659,7 @@ bool snakes_process_packet_input_and_tick_game(void) {
     #ifdef DEBUG_SINGLE_STEP
         bool this_tick_input_found = false;
         for (c = 0u; c < _4P_XFER_RX_SZ; c++) {
-            uint8_t value = _4p_rx_buf_READ_ptr[c];
+            uint8_t value = _4p_rx_fifo_READ_ptr[c];
             // D-Pad input type command
             if ((value & _SIO_CMD_MASK) == _SIO_CMD_DPAD) {
                 // debug_print_info(c, game_tick);

@@ -26,9 +26,9 @@
                                  // Valid values: 1u, 2u, 3u, 4u
                                  // Resulting total RX transfer from DMG-07 will be 4 Players x _4P_XFER_SZ
 
-#define RX_BUF_NUM_PACKETS  8u   // Buffering capacity for up to N RX packets
+#define RX_FIFO_NUM_PACKETS  8u   // Buffering capacity for up to N RX packets
 
-// ALSO ADJUSTABLE: RX_BUF_NUM_PACKETS for controlling how many packets the rx buffer can hold
+// ALSO ADJUSTABLE: RX_FIFO_NUM_PACKETS for controlling how many packets the rx buffer can hold
 
 #if (_4P_XFER_SZ  > 1)
     #error "COMPILE FAIL: _4P_XFER_SZ TX data size larger than 1 byte not supported, to do that add multiple/buffer tx support sio_handle_mode_xfer()"
@@ -171,11 +171,11 @@ enum {
     #define NO_PACKETS_TO_DISARD             0u
 
     // Buffer sizing for Transmission(Xfer) mode
-    #define RX_BUF_PACKET_SZ      (_4P_XFER_RX_SZ)   // Size in bytes of total RX transfer (i.e TX Size x 4 Players)
-    #define RX_BUF_SZ             (RX_BUF_PACKET_SZ * RX_BUF_NUM_PACKETS)
+    #define RX_FIFO_PACKET_SZ      (_4P_XFER_RX_SZ)   // Size in bytes of total RX transfer (i.e TX Size x 4 Players)
+    #define RX_FIFO_SZ            (RX_FIFO_PACKET_SZ * RX_FIFO_NUM_PACKETS)
 
-#if (RX_BUF_SZ  > 256)
-    #error "COMPILE FAIL: RX_BUF_PACKET_SZ * RX_BUF_NUM_PACKETS cannot be larger than 256 bytes"
+#if (RX_FIFO_SZ  > 256)
+    #error "COMPILE FAIL: RX_FIFO_PACKET_SZ * RX_FIFO_NUM_PACKETS cannot be larger than 256 bytes"
 #endif
 
 
@@ -248,18 +248,18 @@ bool four_player_request_change_to_ping_mode(void);
 void four_player_set_packet_discard_count(uint8_t packets_to_discard);
 
 void four_player_set_xfer_data(uint8_t tx_byte);
-uint8_t four_player_rx_buf_get_num_packets_ready(void);
-void four_player_rx_buf_remove_n_packets(uint8_t packet_count_to_remove);
+uint8_t four_player_rx_fifo_get_num_packets_ready(void);
+void four_player_rx_fifo_remove_n_packets(uint8_t packet_count_to_remove);
 void _4p_set_rate(uint8_t speed);
 
 extern uint8_t _4p_mode;
 extern uint8_t _4p_connect_status;
 extern uint8_t _4P_xfer_tx_data;
 
-extern uint8_t _4p_rx_buf[RX_BUF_SZ];
-extern uint8_t * _4p_rx_buf_READ_ptr;
-extern uint8_t   _4p_rx_buf_count;
-extern const uint8_t * _4p_rx_buf_end_wrap_addr;
+extern uint8_t   _4p_rx_fifo[RX_FIFO_SZ];
+extern uint8_t * _4p_rx_fifo_READ_ptr;
+extern uint8_t   _4p_rx_fifo_count;
+extern const uint8_t * _4p_rx_fifo_end_wrap_addr;
 
 extern uint8_t _4p_rx_overflowed_bytes_count;
 
@@ -267,17 +267,17 @@ extern uint8_t _4p_rx_overflowed_bytes_count;
 #define IS_PLAYER_CONNECTED(PLAYER_ID_BIT)  (_4p_connect_status & PLAYER_ID_BIT)
 #define WHICH_PLAYER_AM_I()                 (_4p_connect_status & _4P_PLAYER_ID_MASK)
 #define WHICH_PLAYER_AM_I_ZERO_BASED()      ((_4p_connect_status & _4P_PLAYER_ID_MASK) - 1u)
-#define IS_PLAYER_DATA_READY()              (four_player_rx_buf_get_num_packets_ready() != 0u)
+#define IS_PLAYER_DATA_READY()              (four_player_rx_fifo_get_num_packets_ready() != 0u)
 #define GET_CURRENT_MODE()                  (_4p_mode)
 
 // Due to how the buffer is set up and used, we can assume
 // the READ pointer won't overflow at any time during a single packet read,
 // and so can consolidate the buffer-end wraparound test and
 // count increment to the end of the packet.
-inline void _4p_rx_buf_packet_increment_read_ptr(void) {
-    _4p_rx_buf_READ_ptr += RX_BUF_PACKET_SZ;
-    if (_4p_rx_buf_READ_ptr == _4p_rx_buf_end_wrap_addr)
-        _4p_rx_buf_READ_ptr = _4p_rx_buf;
+inline void _4p_rx_fifo_packet_increment_read_ptr(void) {
+    _4p_rx_fifo_READ_ptr += RX_FIFO_PACKET_SZ;
+    if (_4p_rx_fifo_READ_ptr == _4p_rx_fifo_end_wrap_addr)
+        _4p_rx_fifo_READ_ptr = _4p_rx_fifo;
 }
 
 #endif // _4_PLAYER_ADATER_H

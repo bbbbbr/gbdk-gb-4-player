@@ -31,6 +31,6 @@ void wait_vsync_or_sio_4P_packet_data_ready(void) {
             HALT    ; // Wait for any interrupt
             NOP     ; // HALT sometimes skips the next instruction
         __endasm;
-    } while ( ((_4p_rx_buf_count / RX_BUF_PACKET_SZ) == 0u) && (start_systime == *((uint8_t *)&sys_time)) );
+    } while ( ((_4p_rx_fifo_count / RX_FIFO_PACKET_SZ) == 0u) && (start_systime == *((uint8_t *)&sys_time)) );
 }
 

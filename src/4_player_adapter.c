@@ -35,12 +35,12 @@ uint8_t _4p_xfer_count;                        // Tracks number of bytes handled
 //   - The only locking is around reading the byte RX_COUNT and decrementing it from MAIN
 //     - The ISR has no locking around RX_COUNT
 //
-uint8_t   _4p_rx_buf[RX_BUF_SZ];          // RX Buffer is double buffered to allow access of one while other is filling
-uint8_t * _4p_rx_buf_WRITE_ptr;           // Write pointer to SIO RX buf for incoming data
-uint8_t * _4p_rx_buf_READ_ptr;            // Read pointer to SIO RX buf for reading out the received data
-uint8_t   _4p_rx_buf_count;               // Number of bytes currently in SIO RX buf
-#define                                    RX_BUF_PTR_END_WRAP_ADDR (_4p_rx_buf + RX_BUF_SZ)  // Used by ISR for pointer wraparound
-const uint8_t * _4p_rx_buf_end_wrap_addr = RX_BUF_PTR_END_WRAP_ADDR;                          // Used by Main for pointer wraparound
+uint8_t   _4p_rx_fifo[RX_FIFO_SZ];         // RX Buffer is double buffered to allow access of one while other is filling
+uint8_t * _4p_rx_fifo_WRITE_ptr;           // Write pointer to SIO RX buf for incoming data
+uint8_t * _4p_rx_fifo_READ_ptr;            // Read pointer to SIO RX buf for reading out the received data
+uint8_t   _4p_rx_fifo_count;               // Number of bytes currently in SIO RX buf
+#define                                    RX_FIFO_PTR_END_WRAP_ADDR (_4p_rx_fifo + RX_FIFO_SZ)  // Used by ISR for pointer wraparound
+const uint8_t * _4p_rx_fifo_end_wrap_addr = RX_FIFO_PTR_END_WRAP_ADDR;                          // Used by Main for pointer wraparound
 
 uint8_t _4p_rx_packets_to_discard;        // How many packets remain to be discarded (as requested by main program)
 uint8_t _4p_rx_overflowed_bytes_count;
@@ -112,9 +112,9 @@ static void four_player_init_xfer_mode(void) {
 
     _4p_xfer_count              = _4P_XFER_COUNT_RESET;
     // Buffer and control: Reset read and write pointers to base of buffer, zero count
-    _4p_rx_buf_WRITE_ptr        = _4p_rx_buf;
-    _4p_rx_buf_READ_ptr         = _4p_rx_buf;
-    _4p_rx_buf_count            = 0u;
+    _4p_rx_fifo_WRITE_ptr        = _4p_rx_fifo;
+    _4p_rx_fifo_READ_ptr         = _4p_rx_fifo;
+    _4p_rx_fifo_count            = 0u;
 }
 
 
@@ -173,26 +173,26 @@ void four_player_set_xfer_data(uint8_t tx_byte) {
 }
 
 
-uint8_t four_player_rx_buf_get_num_packets_ready(void) {
+uint8_t four_player_rx_fifo_get_num_packets_ready(void) {
 
     // Don't need a critical section here since Main will
-    // only use data if it's >= RX_BUF_PACKET_SZ.
+    // only use data if it's >= RX_FIFO_PACKET_SZ.
     //
     // If the ISR writes more bytes during this read
     // that's ok. The ISR NEVER decrements it, only Main
     // does that using a Critical section.
-    return _4p_rx_buf_count / RX_BUF_PACKET_SZ;
+    return _4p_rx_fifo_count / RX_FIFO_PACKET_SZ;
 }
 
 
 // Removes N bytes from the RX buffer, with N locked to a multiple of packet size
 // That keeps alignment and write calculations easier
-void four_player_rx_buf_remove_n_packets(uint8_t packet_count_to_remove) {
+void four_player_rx_fifo_remove_n_packets(uint8_t packet_count_to_remove) {
 
-    uint8_t byte_count_to_remove = packet_count_to_remove * RX_BUF_PACKET_SZ;
+    uint8_t byte_count_to_remove = packet_count_to_remove * RX_FIFO_PACKET_SZ;
     CRITICAL {
-        if (byte_count_to_remove <= _4p_rx_buf_count)
-            _4p_rx_buf_count -= byte_count_to_remove;
+        if (byte_count_to_remove <= _4p_rx_fifo_count)
+            _4p_rx_fifo_count -= byte_count_to_remove;
     }
 }
 
@@ -328,11 +328,11 @@ static void sio_handle_mode_xfer(uint8_t sio_byte) {
         SB_REG = _4P_XFER_TX_PAD_VALUE;
 
     // Save the RX data and wrap pointer to start of buffer if needed
-    if (_4p_rx_buf_count != RX_BUF_SZ) { 
+    if (_4p_rx_fifo_count != RX_FIFO_SZ) {
         // If currently discarding packets, don't increment the write pointer
         if (_4p_rx_packets_to_discard == NO_PACKETS_TO_DISARD) {
             // byte count increment and pointer wraparound are done below
-            *_4p_rx_buf_WRITE_ptr++ = sio_byte;
+            *_4p_rx_fifo_WRITE_ptr++ = sio_byte;
             #ifdef DEBUG_SHOW_CHECKSUM
                 // Add any accepted packet byte to naive checksum
                 _4p_sio_packet_checksum += sio_byte;
@@ -359,9 +359,9 @@ static void sio_handle_mode_xfer(uint8_t sio_byte) {
             // the byte Count and WRITE pointer won't overflow at any time during 
             // a single packet write, and so can consolidate the buffer-end
             // wraparound test and Count increment to the end of the packet
-            _4p_rx_buf_count += RX_BUF_PACKET_SZ;
-            if (_4p_rx_buf_WRITE_ptr == RX_BUF_PTR_END_WRAP_ADDR)
-                _4p_rx_buf_WRITE_ptr = _4p_rx_buf;
+            _4p_rx_fifo_count += RX_FIFO_PACKET_SZ;
+            if (_4p_rx_fifo_WRITE_ptr == RX_FIFO_PTR_END_WRAP_ADDR)
+                _4p_rx_fifo_WRITE_ptr = _4p_rx_fifo;
 
             #ifdef DEBUG_SHOW_CHECKSUM
                 // Add any accepted packet as a single increment to naive checksum

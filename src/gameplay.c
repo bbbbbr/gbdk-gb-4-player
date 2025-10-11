@@ -57,7 +57,7 @@ static bool process_packets(void) {
     #endif
 
     // Read number of packets ready and cache it locally (it may change during processing)
-    uint8_t packets_ready = four_player_rx_buf_get_num_packets_ready();
+    uint8_t packets_ready = four_player_rx_fifo_get_num_packets_ready();
 
     for (uint8_t packet = 0; packet < packets_ready; packet++) {
 
@@ -73,11 +73,11 @@ static bool process_packets(void) {
         }
 
         // Move to next packet RX Bytes                
-        _4p_rx_buf_packet_increment_read_ptr();
+        _4p_rx_fifo_packet_increment_read_ptr();
     }
 
     // free up the rx buf space now that it's done being used
-    four_player_rx_buf_remove_n_packets(packets_ready);
+    four_player_rx_fifo_remove_n_packets(packets_ready);
 
     #ifdef DISPLAY_USE_SIO_DATA_DURATION_IN_BGP
         BGP_REG = ~BGP_REG;
@@ -132,32 +132,32 @@ void gameplay_run(void){
 #ifdef DEBUG_LOCAL_SINGLE_PLAYER_ONLY
 
     extern       uint8_t _4P_xfer_tx_data;
-    extern const uint8_t * _4p_rx_buf_end_wrap_addr;
-    extern uint8_t * _4p_rx_buf_WRITE_ptr;
-    extern uint8_t * _4p_rx_buf_READ_ptr;
+    extern const uint8_t * _4p_rx_fifo_end_wrap_addr;
+    extern uint8_t * _4p_rx_fifo_WRITE_ptr;
+    extern uint8_t * _4p_rx_fifo_READ_ptr;
 
     static void _4p_mock_init_xfer_buffers(void) {
         // Buffer and control: Reset read and write pointers to base of buffer, zero count
-        _4p_rx_buf_WRITE_ptr        = _4p_rx_buf;
-        _4p_rx_buf_READ_ptr         = _4p_rx_buf;
-        _4p_rx_buf_count            = 0u;
+        _4p_rx_fifo_WRITE_ptr        = _4p_rx_fifo;
+        _4p_rx_fifo_READ_ptr         = _4p_rx_fifo;
+        _4p_rx_fifo_count            = 0u;
     }
 
 
     static void _4p_mock_packet(void) {
 
-        if (_4p_rx_buf_count != RX_BUF_SZ) {
+        if (_4p_rx_fifo_count != RX_FIFO_SZ) {
 
-            *_4p_rx_buf_WRITE_ptr++ = _4P_xfer_tx_data;
-            *_4p_rx_buf_WRITE_ptr++ = 0x00u;
-            *_4p_rx_buf_WRITE_ptr++ = 0x00u;
-            *_4p_rx_buf_WRITE_ptr++ = 0x00u;
+            *_4p_rx_fifo_WRITE_ptr++ = _4P_xfer_tx_data;
+            *_4p_rx_fifo_WRITE_ptr++ = 0x00u;
+            *_4p_rx_fifo_WRITE_ptr++ = 0x00u;
+            *_4p_rx_fifo_WRITE_ptr++ = 0x00u;
 
-            _4p_rx_buf_count += RX_BUF_PACKET_SZ;
+            _4p_rx_fifo_count += RX_FIFO_PACKET_SZ;
 
             // Handle wraparound
-            if (_4p_rx_buf_WRITE_ptr == _4p_rx_buf_end_wrap_addr)
-                _4p_rx_buf_WRITE_ptr = _4p_rx_buf;
+            if (_4p_rx_fifo_WRITE_ptr == _4p_rx_fifo_end_wrap_addr)
+                _4p_rx_fifo_WRITE_ptr = _4p_rx_fifo;
         }
     }
 

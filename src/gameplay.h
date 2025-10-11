@@ -16,7 +16,7 @@
 //
 // This is to avoid dumping serial packet data in an uncontrolled way
 // if the RX buffer goes too long without being serviced. The alternate
-// is to make the RX packet buffer deeper (RX_BUF_NUM_PACKETS), but that
+// is to make the RX packet buffer deeper (RX_FIFO_NUM_PACKETS), but that
 // uses more memory.
 #define FOUR_PLAYER_INITIAL_RX_PACKET_DISCARD_COUNT   8u
 
