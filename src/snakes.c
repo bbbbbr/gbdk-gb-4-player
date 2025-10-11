@@ -661,6 +661,10 @@ void snakes_process_packet_input(void) {
         // Move to next snake
         player_id_bit <<= 1;
     }
+    #ifdef DEBUG_PRINT_PLAYER_READY_STATUS
+        debug_print_info(4, game_players_ready_expected);
+        debug_print_info(5, game_players_ready_status);
+    #endif
 }
 
 

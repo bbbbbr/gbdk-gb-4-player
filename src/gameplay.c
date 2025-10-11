@@ -112,12 +112,7 @@ void gameplay_run(void){
         sio_checksum = 0u;
     #endif
 
-    // Wait for packet discarding to complete
-    while (four_player_get_packet_discard_count() > 0u);
-    // Send ready signal with player bit
-    four_player_set_xfer_data(_SIO_CMD_READY | (PLAYER_1 << WHICH_PLAYER_AM_I_ZERO_BASED()) );
-
-    while (1) {
+    while (1) {    
         UPDATE_KEYS();
         wait_vsync_or_sio_4P_packet_data_ready();
 
@@ -126,6 +121,12 @@ void gameplay_run(void){
                 // Handle Game Over: back to main loop
                 return;
             }
+        }
+
+        // Send ready signal with player bit once per frame
+        // until all player consoles are ready
+        if (game_players_all_signaled_ready == false) {
+            four_player_set_xfer_data(_SIO_CMD_READY | (PLAYER_1 << WHICH_PLAYER_AM_I_ZERO_BASED()) );
         }
 
         // Exit title screen once mode is switched to PING
