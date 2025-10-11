@@ -226,14 +226,15 @@ enum {
 // Player connectivity bits
 // Bit packing for player connection byte broadcasted by hardware (stored in _4p_connect_status) is:
 // .7 .. .4 = Player connection status bits, one bit per player
-// .3 .. .0 = "Your" player number, range 1-4
 #define _4P_PLAYER_ID_MASK 0x07u
 #define _4P_CONNECT_NONE   0u
 #define _4P_PLAYER_1   (1u << 4)
 #define _4P_PLAYER_2   (1u << 5)
 #define _4P_PLAYER_3   (1u << 6)
 #define _4P_PLAYER_4   (1u << 7)
-
+#define _4P_CONNECT_BITS_DOWNSHIFT  4u
+//
+// .3 .. .0 = "Your" player number, range 1-4
 #define PLAYER_1  1u
 #define PLAYER_2  2u
 #define PLAYER_3  3u
@@ -246,6 +247,7 @@ bool four_player_request_change_to_xfer_mode(void);
 bool four_player_request_change_to_ping_mode(void);
 
 void four_player_set_packet_discard_count(uint8_t packets_to_discard);
+uint8_t four_player_get_packet_discard_count(void);
 
 void four_player_set_xfer_data(uint8_t tx_byte);
 uint8_t four_player_rx_fifo_get_num_packets_ready(void);
@@ -267,7 +269,7 @@ extern uint8_t _4p_rx_overflowed_bytes_count;
 #define IS_PLAYER_CONNECTED(PLAYER_ID_BIT)  (_4p_connect_status & PLAYER_ID_BIT)
 #define WHICH_PLAYER_AM_I()                 (_4p_connect_status & _4P_PLAYER_ID_MASK)
 #define WHICH_PLAYER_AM_I_ZERO_BASED()      ((_4p_connect_status & _4P_PLAYER_ID_MASK) - 1u)
-#define IS_PLAYER_DATA_READY()              (four_player_rx_fifo_get_num_packets_ready() != 0u)
+#define IS_PLAYER_DATA_AVAILABLE()              (four_player_rx_fifo_get_num_packets_ready() != 0u)
 #define GET_CURRENT_MODE()                  (_4p_mode)
 
 // Due to how the buffer is set up and used, we can assume

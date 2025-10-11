@@ -165,6 +165,13 @@ void four_player_set_packet_discard_count(uint8_t packets_to_discard) {
 }
 
 
+
+// Returns whether packets are still being discarded
+uint8_t four_player_get_packet_discard_count(void) {
+    return  _4p_rx_packets_to_discard;
+}
+
+
 void four_player_set_xfer_data(uint8_t tx_byte) {
     // Don't need a critical section here since it's read-only from the ISR
     // CRITICAL {

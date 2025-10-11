@@ -14,6 +14,10 @@
 
 uint8_t game_this_player_status;
 
+bool    game_players_all_signaled_ready;
+uint8_t game_players_ready_expected;
+uint8_t game_players_ready_status;
+
 static void gameplay_init(void) {
 
     // Takes at least 6 frames with screen on
@@ -43,6 +47,9 @@ static void gameplay_init(void) {
     fade_in();
 
     GAMEPLAY_SET_THIS_PLAYER_STATUS(PLAYER_STATUS_INGAME);
+    game_players_ready_status       = _4P_CONNECT_NONE;
+    game_players_ready_expected     = _4P_CONNECT_NONE;
+    game_players_all_signaled_ready = false;
 }
 
 
@@ -65,11 +72,17 @@ static bool process_packets(void) {
             sio_checksum++;
         #endif
 
-        if (snakes_process_packet_input_and_tick_game() == false) {
-            #ifdef DISPLAY_USE_SIO_DATA_DURATION_IN_BGP
-                BGP_REG = ~BGP_REG;
-            #endif
-            return false;
+        // Process player input (direction, pause, console ready status, etc)
+        snakes_process_packet_input();
+
+        // Only tick the game once all player consoles have yet signaled readiness
+        if (game_players_all_signaled_ready) {
+            if (snakes_tick_game() == false) {
+                #ifdef DISPLAY_USE_SIO_DATA_DURATION_IN_BGP
+                    BGP_REG = ~BGP_REG;
+                #endif
+                return false;
+            }
         }
 
         // Move to next packet RX Bytes                
@@ -90,15 +103,25 @@ static bool process_packets(void) {
 void gameplay_run(void){
 
     gameplay_init();
+
+    // Save number of connected players for checking
+    // whether all players have signaled readiness
+    game_players_ready_expected = _4p_connect_status >> _4P_CONNECT_BITS_DOWNSHIFT;
+
     #ifdef DEBUG_SHOW_CHECKSUM
         sio_checksum = 0u;
     #endif
+
+    // Wait for packet discarding to complete
+    while (four_player_get_packet_discard_count() > 0u);
+    // Send ready signal with player bit
+    four_player_set_xfer_data(_SIO_CMD_READY | (PLAYER_1 << WHICH_PLAYER_AM_I_ZERO_BASED()) );
 
     while (1) {
         UPDATE_KEYS();
         wait_vsync_or_sio_4P_packet_data_ready();
 
-        if (IS_PLAYER_DATA_READY()) {
+        if (IS_PLAYER_DATA_AVAILABLE()) {
             if (process_packets() == false) {
                 // Handle Game Over: back to main loop
                 return;
@@ -170,13 +193,15 @@ void gameplay_run(void){
         _4p_connect_status = (_4P_PLAYER_1 | _4P_PLAYER_2 | _4P_PLAYER_3 | _4P_PLAYER_4) | PLAYER_1;
 
         gameplay_init();
+
         _4p_mock_init_xfer_buffers();
+        game_players_all_signaled_ready = true;
 
         while (1) {
             UPDATE_KEYS();
             vsync();
 
-            if (IS_PLAYER_DATA_READY()) {
+            if (IS_PLAYER_DATA_AVAILABLE()) {
                 if (process_packets() == false) {
                     // Handle Game Over: back to main loop
                     return;

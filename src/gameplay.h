@@ -33,4 +33,8 @@ static void gameplay_init(void);
 
 extern uint8_t game_this_player_status;
 
+extern bool    game_players_all_signaled_ready;
+extern uint8_t game_players_ready_expected;
+extern uint8_t game_players_ready_status;
+
 #endif

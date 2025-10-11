@@ -624,6 +624,11 @@ static bool snake_check_for_input(uint8_t p_num) {
         if (payload == BUTTON_START)
             game_toggle_pause_requested = true;
     }
+    else if (cmd == _SIO_CMD_READY) {
+        game_players_ready_status |= payload;
+        if (game_players_ready_status == game_players_ready_expected)
+            game_players_all_signaled_ready = true;
+    }
 
     return false;
 }
@@ -641,20 +646,34 @@ static bool snake_check_for_input(uint8_t p_num) {
 // so that it appears on each console at the same exact time
 // and in the same exact order.
 //
+
+void snakes_process_packet_input(void) {
+    static uint8_t c;
+
+    game_toggle_pause_requested = false;
+
+    uint8_t player_id_bit = _4P_PLAYER_1;  // Start at lowest player bit
+    for (c = 0u; c < _4P_XFER_RX_SZ; c++) {
+
+        if (IS_PLAYER_CONNECTED(player_id_bit) && (snakes[c].is_alive)) {
+            snake_check_for_input(c);
+        }
+        // Move to next snake
+        player_id_bit <<= 1;
+    }
+}
+
+
 #ifdef DEBUG_SHOW_CHECKSUM
     extern uint16_t sio_checksum;
     extern uint16_t _4p_sio_packet_checksum;
 #endif
-
-bool snakes_process_packet_input_and_tick_game(void) {
+bool snakes_tick_game(void) {
     static uint8_t c;
+
 
     // One game tick per 4 Player data packet
     game_tick++;
-    game_toggle_pause_requested = false;
-
-    uint8_t player_id_bit = _4P_PLAYER_1;  // Start at lowest player bit
-
 
     #ifdef DEBUG_SINGLE_STEP
         bool this_tick_input_found = false;
@@ -683,11 +702,10 @@ bool snakes_process_packet_input_and_tick_game(void) {
     // Loop through all bytes in the packet.
     // Each byte in the packet represents input/commands
     // from one of the players (0..3)
+    uint8_t player_id_bit = _4P_PLAYER_1;  // Start at lowest player bit
     for (c = 0u; c < _4P_XFER_RX_SZ; c++) {
 
         if (IS_PLAYER_CONNECTED(player_id_bit) && (snakes[c].is_alive)) {
-
-            snake_check_for_input(c);
 
             if (game_is_paused == false) {
 

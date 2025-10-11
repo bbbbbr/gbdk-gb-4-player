@@ -138,7 +138,7 @@ void gameover_run(void){
         UPDATE_KEYS();
         wait_vsync_or_sio_4P_packet_data_ready();
 
-        if (IS_PLAYER_DATA_READY()) {
+        if (IS_PLAYER_DATA_AVAILABLE()) {
             if (process_packets() == false) {
                 // Handle exit Game Over screen
                 four_player_request_change_to_ping_mode();
@@ -209,7 +209,7 @@ void gameover_run(void){
             UPDATE_KEYS();
             vsync();
 
-            if (IS_PLAYER_DATA_READY()) {
+            if (IS_PLAYER_DATA_AVAILABLE()) {
                 if (process_packets() == false) {
                     // Handle exit Game Over screen
                     return;

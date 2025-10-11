@@ -80,7 +80,8 @@ void snakes_init_and_draw(void);
 // void snakes_reset(void);
 // void snakes_redraw_all(void);
 
-bool snakes_process_packet_input_and_tick_game(void);
+void snakes_process_packet_input(void);
+bool snakes_tick_game(void);
 
 #ifdef DEBUG_SINGLE_STEP
     void debug_print_info(uint8_t p_num, uint8_t tick);

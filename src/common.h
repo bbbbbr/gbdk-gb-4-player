@@ -44,6 +44,7 @@
 
 #define _SIO_CMD_DPAD    0x80u
 #define _SIO_CMD_BUTTONS 0x90u
+#define _SIO_CMD_READY   0xA0u
 
 
 #endif // _COMMON_H
