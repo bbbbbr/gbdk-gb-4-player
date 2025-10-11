@@ -109,10 +109,14 @@ const uint8_t * _4p_rx_buf_end_wrap_addr = RX_BUF_PTR_END_WRAP_ADDR;            
 
 uint8_t sio_keepalive;               // Monitor SIO rx count to detect disconnects
 
-
+uint8_t _4p_speed;
 
 // =================== State change functions ===================
 
+
+void four_player_set_speed(uint8_t speed) {
+    _4p_speed = speed;
+}
 
 // May be called either from Main code or ISR, so no critical section
 // (main caller expected to wrap it in critical)
@@ -127,6 +131,8 @@ inline void four_player_reset_to_ping_no_critical(void) {
 
 
 void four_player_init(void) {
+
+    _4p_speed = _4P_REPLY_PING_SPEED;  // Load default speed
 
     CRITICAL {
         four_player_reset_to_ping_no_critical();
@@ -283,7 +289,7 @@ static void sio_handle_mode_ping(uint8_t sio_byte) {
                 break;
 
             case _4P_PING_STATE_STATUS2:
-                SB_REG = _4P_REPLY_PING_SPEED;      // Pre-load Status3 reply (SpeedPacket Size)
+                SB_REG = _4p_speed; // _4P_REPLY_PING_SPEED;      // Pre-load Status3 reply (SpeedPacket Size)
                 _4p_connect_status = sio_byte;      // Save player connection data
                 _4p_mode_state++;
                 break;

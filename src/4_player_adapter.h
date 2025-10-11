@@ -140,6 +140,7 @@ enum {
 #define PLAYER_3  3u
 #define PLAYER_4  4u
 
+void four_player_set_speed(uint8_t speed);
 void four_player_init(void);
 void four_player_enable(void);
 void four_player_disable(void);

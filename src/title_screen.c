@@ -1,6 +1,8 @@
 #include <gbdk/platform.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
+#include <gbdk/console.h>
 
 #include "common.h"
 #include "input.h"
@@ -52,9 +54,9 @@ uint16_t tx_track[4];
 static void title_screen_init(void) {
 
     // Load map and tiles
-    set_bkg_data(BG_TITLE_BG_TILES_START, title_bg_TILE_COUNT, title_bg_tiles);
-    set_bkg_tiles(0,0, (title_bg_WIDTH / title_bg_TILE_W),
-                       (title_bg_HEIGHT / title_bg_TILE_H), title_bg_map);
+    // set_bkg_data(BG_TITLE_BG_TILES_START, title_bg_TILE_COUNT, title_bg_tiles);
+    // set_bkg_tiles(0,0, (title_bg_WIDTH / title_bg_TILE_W),
+    //                    (title_bg_HEIGHT / title_bg_TILE_H), title_bg_map);
 
     set_bkg_data((uint8_t)BG_CHECKBOX_TILES_START, checkbox_TILE_COUNT, checkbox_tiles);
     set_bkg_data((uint8_t)BG_FONT_NUMS_TILES_START, font_nums_TILE_COUNT, font_nums_tiles);
@@ -286,12 +288,12 @@ void title_screen_run(void){
             case 135u:
                 if (test_dir == 1) {
                     if (adapter_rate < 255u)
-                        _4p_set_speed(++adapter_rate);
+                        four_player_set_speed(++adapter_rate);
                     else
                         test_dir = ~test_dir;
                 } else {
                     if (adapter_rate > 0x01u)
-                        _4p_set_speed(--adapter_rate);
+                        four_player_set_speed(--adapter_rate);
                     else {
                         // End test loop after Up -> Down
                         test_counter = TEST_DONE;
@@ -364,10 +366,10 @@ void title_screen_run(void){
 
 
         else if (KEY_TICKED(J_UP)) {
-            if (adapter_rate < 255u) _4p_set_speed(++adapter_rate);
+            if (adapter_rate < 255u) four_player_set_speed(++adapter_rate);
         }
         else if (KEY_TICKED(J_DOWN)) {
-            if (adapter_rate > 0x10u) _4p_set_speed(--adapter_rate);
+            if (adapter_rate > 0x10u) four_player_set_speed(--adapter_rate);
         }
     }
 }
