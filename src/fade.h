@@ -11,7 +11,7 @@
 #define BG_PAL_TITLE 0
 #define BG_PAL_BOARD 1
 
-void fade_in(uint8_t delay_len, uint8_t which_bg_pal);
-void fade_out(uint8_t delay_len, uint8_t which_bg_pal);
+void fade_in(void);
+void fade_out(void);
 
 #endif // _FADE_H

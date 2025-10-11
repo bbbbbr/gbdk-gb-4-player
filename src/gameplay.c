@@ -40,7 +40,7 @@ static void gameplay_init(void) {
                     0u, (uint8_t)PAUSED_SPR_X, (uint8_t)PAUSED_SPR_Y);
 
     snakes_init_and_draw();
-
+    fade_in();
 
     GAMEPLAY_SET_THIS_PLAYER_STATUS(PLAYER_STATUS_INGAME);
 }

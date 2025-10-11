@@ -38,6 +38,7 @@ void title_screen_init(void) {
 
     hide_sprites_range(0, MAX_HARDWARE_SPRITES);
     SHOW_SPRITES;
+    fade_in();
 }
 
 

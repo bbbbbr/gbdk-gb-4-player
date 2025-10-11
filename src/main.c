@@ -26,6 +26,7 @@ static void main_init(void) {
     BGP_REG  = DMG_PALETTE(DMG_WHITE, DMG_LITE_GRAY, DMG_DARK_GRAY, DMG_BLACK);
     OBP0_REG = DMG_PALETTE(DMG_DARK_GRAY, DMG_WHITE, DMG_LITE_GRAY, DMG_BLACK);
 
+    fade_out();
 	UPDATE_KEYS();
 }
 
@@ -40,10 +41,12 @@ void main(void){
     while (1) {
         #ifdef DEBUG_LOCAL_SINGLE_PLAYER_ONLY
             title_screen_init();
+            fade_out();
 
             gameplay_run_local_only();
 
             gameover_run_local_only();
+            fade_out();            
         #else
             // Drop initial packets during vram setup and the first few packets
             // sent by the DMG-07 adapter which may have random data mixed in
@@ -51,10 +54,12 @@ void main(void){
             four_player_set_packet_discard_count(FOUR_PLAYER_INITIAL_RX_PACKET_DISCARD_COUNT);
 
             title_screen_run();
+            fade_out();
 
             gameplay_run();
 
             gameover_run();
+            fade_out();
         #endif
     }
 }
