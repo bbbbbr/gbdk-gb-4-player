@@ -33,6 +33,7 @@ typedef struct {
     uint8_t size_digit_lo; // Lower digit 0-9
 
     bool is_alive;
+    bool got_disconnected;
 
     #ifdef ENABLE_SPAWN_HAZARD_AFTER_EATING
     uint8_t spawn_hazard_next_move;
@@ -125,6 +126,8 @@ static uint8_t snake_calc_tile_body(uint8_t p_num);
 
 static void snake_board_reset(void);
 
+static void snakes_handle_disconnect(uint8_t p_num);
+static void snake_render_dead(uint8_t p_num, bool got_disconnected);
 static uint8_t snake_try_head_increment(uint8_t p_num);
 static void snake_tail_increment(uint8_t p_num);
 static void snake_length_increment_and_render(uint8_t p_num);
@@ -286,6 +289,7 @@ void snakes_init_and_draw(void) {
 
             snakes_alive_count++;
             snakes[c].is_alive = true;
+            snakes[c].got_disconnected = false;
             #ifdef ENABLE_SPAWN_HAZARD_AFTER_EATING
             snakes[c].spawn_hazard_next_move = 0u;
             #endif
@@ -331,16 +335,26 @@ void snakes_init_and_draw(void) {
 }
 
 
+// Called when a given console is detected as disconnected from the game
+static void snakes_handle_disconnect(uint8_t p_num) {
+    snakes[p_num].is_alive = false;
+    snakes_alive_count--;
+    snake_render_dead(p_num, DISCONNECTED_YES);
+}
+
+
 // Render a snake as dead on the board
 // Filling it's tiles with skulls marked as collide-able
-void snake_render_dead( uint8_t p_num) {
+static void snake_render_dead(uint8_t p_num, bool got_disconnected) {
 
-    static bool  is_this_player;
+    static bool    is_this_player;
     static uint8_t skull_icon;
     static uint8_t head_x, head_y;
 
     is_this_player = WHICH_PLAYER_AM_I_ZERO_BASED() == p_num;
     skull_icon = (is_this_player) ? BOARD_TILE_SKULL_DARK : BOARD_TILE_SKULL_LITE;
+    // If the player died via disconnect, render X's instead of skulls
+    if (got_disconnected) skull_icon = BG_FONT_NUMS_TILES_START + BG_FONT_X; // BG_FONT_NUMS_TILES_START + p_num; // (for debug, can use snake number as tile)
 
     head_x = snakes[p_num].head_x;
     head_y = snakes[p_num].head_y;
@@ -542,7 +556,7 @@ static bool snake_handle_head_increment_result(uint8_t p_num, uint8_t try_move) 
         // Could do tail shrink and point loss when snakes collide
         snakes[p_num].is_alive = false;
         snakes_alive_count--;
-        snake_render_dead(p_num);
+        snake_render_dead(p_num, DISCONNECTED_NO);
 
         // Put X's over dead snake's length display
         // (except when in single player mode, so it remains visible after single player game ended)
@@ -629,6 +643,16 @@ static bool snake_check_for_input(uint8_t p_num) {
         if (game_players_ready_status == game_players_ready_expected)
             game_players_all_signaled_ready = true;
     }
+    else if (cmd == _SIO_CMD_HEARTBEAT) {
+        // Default keep alive heartbeat when no other commands sent, no action here
+    }
+    else {
+        // No heartbeat or command? Mark player as disconnected
+        // (a single packet missed can trigger disconnect, in this game's approach that's necessary)
+        #ifndef DEBUG_LOCAL_SINGLE_PLAYER_ONLY
+            if (game_players_all_signaled_ready) snakes[p_num].got_disconnected = true;
+        #endif
+    }
 
     return false;
 }
@@ -710,6 +734,12 @@ bool snakes_tick_game(void) {
     for (c = 0u; c < _4P_XFER_RX_SZ; c++) {
 
         if (IS_PLAYER_CONNECTED(player_id_bit) && (snakes[c].is_alive)) {
+
+            // Kill off any players that got disconnected
+            // Only called once for a disconnected player since is_alive will be set false
+            if (snakes[c].got_disconnected) {
+                snakes_handle_disconnect(c);
+            }
 
             if (game_is_paused == false) {
 

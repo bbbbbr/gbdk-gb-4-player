@@ -68,6 +68,9 @@
 #define HAZARD_SPAWN_VALUE       0x00u  // Spawn a hazard if the random roll returns this value
 #define HAZARD_SPAWN_MASK        0x07u  // 1 in 7 chance of spawning a hazard instead of food
 
+#define DISCONNECTED_NO          false
+#define DISCONNECTED_YES         true
+
 #define DIR_BITS_FROM_BOARD(board_byte)     (board_byte >> 4)
 // #define DIR_BITS_TO_BOARD(dir)           ((dir & BOARD_TAIL_DIR_BITS) >> 4)
 #define PLAYER_AND_DIR_BITS_TO_BOARD(p_num)         ((snakes[p_num].dir << BOARD_DIR_BITSHIFT) | p_num)
