@@ -9,6 +9,10 @@
 
 #include "gfx.h"
 
+#ifdef DEBUG_SELECT_BUTTON_SCREEN_MEMDUMP
+    #include "debug_dump_mem.h"
+#endif
+
 
 #define CHECKBOX_ROW 14u
 // Checkbox positions for players 1 - 4
@@ -83,8 +87,13 @@ void title_screen_run(void){
         vsync_or_sio_4P_mode_change();
 
         // Exit title screen once mode is switched to XFER
-        if (GET_CURRENT_MODE() == _4P_STATE_XFER)
+        if (GET_CURRENT_MODE() == _4P_STATE_XFER) {
+            #ifdef DEBUG_SELECT_BUTTON_SCREEN_MEMDUMP
+                if (joypad() & J_SELECT) debug_dump_mem();
+            #endif
+
             return;
+        }
 
         update_connection_display();
 

@@ -14,6 +14,9 @@
 #include "snakes.h"
 #include "gameplay.h"
 
+#ifdef DEBUG_SELECT_BUTTON_SCREEN_MEMDUMP
+    #include "debug_dump_mem.h"
+#endif
 
 uint8_t game_tick;
 uint8_t game_tick_speed;
@@ -635,13 +638,24 @@ static bool snake_check_for_input(uint8_t p_num) {
         }
     }
     else if (cmd == _SIO_CMD_BUTTONS) {
+
         if (payload == BUTTON_START)
             game_toggle_pause_requested = true;
     }
     else if (cmd == _SIO_CMD_READY) {
+
         game_players_ready_status |= payload;
-        if (game_players_ready_status == game_players_ready_expected)
+        if (game_players_ready_status == game_players_ready_expected) {
             game_players_all_signaled_ready = true;
+
+            #ifdef DEBUG_SELECT_BUTTON_SCREEN_MEMDUMP
+                if (request_dump_mem_on_ready) {
+                    debug_dump_mem();
+                    request_dump_mem_on_ready = false;
+                }
+            #endif
+        }
+
     }
     else if (cmd == _SIO_CMD_HEARTBEAT) {
         // Default keep alive heartbeat when no other commands sent, no action here

@@ -11,6 +11,9 @@
 #include "snakes.h"
 #include "gameplay.h"
 
+#ifdef DEBUG_SELECT_BUTTON_SCREEN_MEMDUMP
+    #include "debug_dump_mem.h"
+#endif
 
 uint8_t game_this_player_status;
 
@@ -104,6 +107,13 @@ void gameplay_run(void){
 
     gameplay_init();
 
+    #ifdef DEBUG_SELECT_BUTTON_SCREEN_MEMDUMP
+        request_dump_mem_on_ready = false;
+        if (joypad() & J_SELECT) {
+            request_dump_mem_on_ready = true;
+        }
+    #endif
+
     // Save number of connected players for checking
     // whether all players have signaled readiness
     game_players_ready_expected = _4p_connect_status >> _4P_CONNECT_BITS_DOWNSHIFT;
@@ -194,6 +204,13 @@ void gameplay_run(void){
         _4p_connect_status = (_4P_PLAYER_1 | _4P_PLAYER_2 | _4P_PLAYER_3 | _4P_PLAYER_4) | PLAYER_1;
 
         gameplay_init();
+
+        #ifdef DEBUG_SELECT_BUTTON_SCREEN_MEMDUMP
+            if (joypad() & J_SELECT) {
+                debug_dump_mem();
+                gameplay_init();
+            }
+        #endif
 
         _4p_mock_init_xfer_buffers();
         game_players_all_signaled_ready = true;
