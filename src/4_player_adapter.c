@@ -64,7 +64,11 @@ inline void four_player_reset_to_ping_no_critical(void) {
     sio_keepalive               = SIO_KEEPALIVE_RESET;
     _4p_request_switch_to_xfer_mode = false;
 
-    _4p_rx_packets_to_discard     = 0u;
+    // Drop initial packets during vram setup and the first few packets
+    // sent by the DMG-07 adapter which may have random data mixed in
+    // This only applies in Transmission mode
+    _4p_rx_packets_to_discard     = FOUR_PLAYER_INITIAL_RX_PACKET_DISCARD_COUNT;
+
     _4p_rx_overflowed_bytes_count = 0u;
     #ifdef DEBUG_SHOW_CHECKSUM
     _4p_sio_packet_checksum       = 0u;

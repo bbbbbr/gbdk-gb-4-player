@@ -12,6 +12,16 @@
 #define SIO_KEEPALIVE_RESET   60u
 #define SIO_KEEPALIVE_TIMEOUT 0u
 
+// Loading tile and map data at start of gameplay takes about 6 frames,
+// so gnore that many packets plus a few more as wiggle room.
+// Add 8 + 8 more for fades in and out
+//
+// This is to avoid dumping serial packet data in an uncontrolled way
+// if the RX buffer goes too long without being serviced. The alternate
+// is to make the RX packet buffer deeper (RX_FIFO_NUM_PACKETS), but that
+// uses more memory.
+#define FOUR_PLAYER_INITIAL_RX_PACKET_DISCARD_COUNT   (12u + 8u + 8u)
+
 
 // Console TX SIZE: controls how many bytes are sent from each console. 
 // - Min: 1 -> x 4 = 4  byte total Packer Size
@@ -167,7 +177,7 @@ enum {
     #define _4P_XFER_TX_PADDING_SZ           (_4P_XFER_RX_SZ - _4P_XFER_TX_SZ)  // Number of bytes to send during Send byte count set in Ping stage
     #define _4P_XFER_COUNT_RESET             0u
     #define _4P_XFER_TX_PAD_VALUE            0x00u
-    #define _4P_XFER_CLEAR_TX_AFTER_TRANSMIT_VALUE 0x00u
+    #define _4P_XFER_CLEAR_TX_AFTER_TRANSMIT_VALUE _SIO_CMD_HEARTBEAT // 0x00u
     #define NO_PACKETS_TO_DISARD             0u
 
     // Buffer sizing for Transmission(Xfer) mode
@@ -226,7 +236,7 @@ enum {
 // Player connectivity bits
 // Bit packing for player connection byte broadcasted by hardware (stored in _4p_connect_status) is:
 // .7 .. .4 = Player connection status bits, one bit per player
-#define _4P_PLAYER_ID_MASK 0x07u
+#define _4P_PLAYER_ID_MASK   0x07u
 #define _4P_CONNECT_NONE   0u
 #define _4P_PLAYER_1   (1u << 4)
 #define _4P_PLAYER_2   (1u << 5)
@@ -255,7 +265,7 @@ void four_player_rx_fifo_remove_n_packets(uint8_t packet_count_to_remove);
 void _4p_set_rate(uint8_t speed);
 
 extern uint8_t _4p_mode;
-extern uint8_t _4p_connect_status;
+extern uint8_t _4p_connect_status;  // This value is only set during the Ping mode and not updated in Transmission mode
 extern uint8_t _4P_xfer_tx_data;
 
 extern uint8_t   _4p_rx_fifo[RX_FIFO_SZ];
