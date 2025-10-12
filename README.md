@@ -1,10 +1,19 @@
 # Example using the Game Boy Four Player Adapter (DMG-07) in C/GBDK-2020.
-Status:
-- 4-player adapter: Protocol implemented and entirely working. Code in src: [4_player_adapter.c](src/4_player_adapter.c) and [4_player_adapter.h](src/4_player_adapter.h)
-- Gameplay: Basic example of multi-player snake (1-4 players)
-  - In the case of 1-player only, it must be the
+Den of Snakes is a simple 4 player snake game for the Game Boy.
 
 ![Photograph of four Game Boy and clone consoles connected via the Four Player Adapter](/info/game_boy_four_player_consoles.gif)
+
+![Screenshot of the game title screen with the text Den of Snakes, and a drawing of four snakes emerging from the DMG-07 four player adapter ports. Each snake has a different facial expression.](/info/game_boy_4_player_den_of_snakes_title_3x.png)
+
+# Download ROM
+Download at: https://bbbbbr.itch.io/den-of-snakes-four-player
+
+# License:
+- Graphical assets: CC-BY-NC-ND, meaning no commercial use or derivatives without explicit permission.
+- Source code: Public domain
+
+Thinking about making a game that uses the 4 Player adapter? You are welcome (and encouraged!) to use the source code in your project. The main source files of interest are [4_player_adapter.c](src/4_player_adapter.c) and [4_player_adapter.h](src/4_player_adapter.h)
+
 
 # Game Implementation
 In this game the approach to solve potential synchronization issues across four consoles is as follows.
@@ -12,9 +21,25 @@ In this game the approach to solve potential synchronization issues across four 
 - __All__ input is routed through the 4-player adapter and __only__ used after being received from it.
 - The game state only ticks when 4-player packets are received (~about once per frame with the configured timing, so it adds 1 frame of input lag).
 
-As a result of this, for the most part, consoles do not broadcast events to each other aside from button inputs. Instead if a player dies on one console, it is essentially guaranteed (as long as there is no packet loss) that the player dies in the same exact manner/location/game timing on all the other consoles.
+As a result of this, consoles broadcast a keep-alive heart beat when not sending button events. Due to the parallel nature, if a player dies on one console then they also die in the exact same manner/location/game timing on all the other consoles.
 
 This approach will not be suitable for all games- however the example hardware interface code is agnostic to how games are implemented.
+
+# System Requirements
+- Hardware: In order to play this game on hardware you need at least one Game Boy (preferably more!) and a Nintendo DMG-07 Four Player Adapter.
+- Emulators TODO: Double Cherry? GBE+?
+
+# Gameplay
+Objective: Be the last snake alive!
+
+Eating hearts grows your snake and deposits skulls. When a snake crashes into skulls or another snake then that snake/player dies and their snake is turned into skull bones. The game ends when only a single player is left alive, that player wins.
+
+When only one player is connected to the DMG-07 then the objective is just to make as long a snake as possible.
+
+# Controls
+- Move Snake: D-PAD
+- Pause: START
+- Start Game: START (on any connected console)
 
 
 # Issues with powered-off GBAs
