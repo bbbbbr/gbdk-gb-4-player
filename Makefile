@@ -7,6 +7,8 @@ endif
 LCC = $(GBDK_HOME)bin/lcc
 PNG2ASSET = $(GBDK_HOME)bin/png2asset
 
+VERSION=0.9.5
+
 # Set platforms to build here, spaced separated. (These are in the separate Makefile.targets)
 # They can also be built/cleaned individually: "make gg" and "make gg-clean"
 # Possible are: gb gbc pocket megaduck sms gg
@@ -55,7 +57,9 @@ endif
 
 
 # You can set the name of the ROM file here
-PROJECTNAME = gb4player
+PROJECTNAME = DenOfSnakes_GB_4Player
+
+PACKAGE_DIR = "../build_archive/$(VERSION)"
 
 # EXT?=gb # Only sets extension to default (game boy .gb) if not populated
 SRCDIR      = src
@@ -133,6 +137,12 @@ clean:
 romusage:
 	# Ignores failure if romusage not in path
 	-romusage -g -sRp build/gb/$(PROJECTNAME).noi
+
+package:
+	mkdir -p "$(PACKAGE_DIR)"
+	zip -j -9 "$(PACKAGE_DIR)/$(VERSION)_$(PROJECTNAME)_megaduck.zip"            README.md build/duck/*.duck
+	zip -j -9 "$(PACKAGE_DIR)/$(VERSION)_$(PROJECTNAME)_gameboy.zip"             README.md build/gb/*.gb
+
 
 # Include available build targets
 include Makefile.targets
