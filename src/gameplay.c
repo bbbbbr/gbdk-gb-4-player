@@ -189,9 +189,9 @@ void gameplay_run(void){
     void gameplay_run_local_only(void){
 
         // Debug, set only local player present
-        // _4p_connect_status = _4P_PLAYER_1 | PLAYER_1;
+        _4p_connect_status = _4P_PLAYER_1 | PLAYER_1;
         // _4p_connect_status = (_4P_PLAYER_1 | _4P_PLAYER_3) | PLAYER_1;
-        _4p_connect_status = (_4P_PLAYER_1 | _4P_PLAYER_2 | _4P_PLAYER_3 | _4P_PLAYER_4) | PLAYER_1;
+        // _4p_connect_status = (_4P_PLAYER_1 | _4P_PLAYER_2 | _4P_PLAYER_3 | _4P_PLAYER_4) | PLAYER_1;
 
         gameplay_init();
 
