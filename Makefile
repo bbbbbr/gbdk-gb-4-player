@@ -50,14 +50,17 @@ ifdef GBDK_DEBUG
 	LCCFLAGS += -debug -v
 endif
 
+# You can set the name of the ROM file here
+PROJECTNAME = DenOfSnakes_GB_4Player
+
+
 ifdef LOCAL_ONLY_ENABLED
 	CFLAGS += -DDEBUG_LOCAL_SINGLE_PLAYER_ONLY=1
 	LCCFLAGS += -DDEBUG_LOCAL_SINGLE_PLAYER_ONLY=1
+	LOCAL_ONLY_FILENAME=_localonly_NO4PLAYER
+	PROJECTNAME = DenOfSnakes_GB_4Player_localonly_NO4PLAYER
 endif
 
-
-# You can set the name of the ROM file here
-PROJECTNAME = DenOfSnakes_GB_4Player
 
 PACKAGE_DIR = "../build_archive/$(VERSION)"
 
@@ -89,6 +92,9 @@ DEPS = $(OBJS:%.o=%.d)
 
 # Builds all targets sequentially
 all: $(TARGETS)
+
+package-localonly:
+	${MAKE} LOCAL_ONLY_ENABLED=YES package
 
 localonly:
 	${MAKE} LOCAL_ONLY_ENABLED=YES
@@ -140,8 +146,8 @@ romusage:
 
 package:
 	mkdir -p "$(PACKAGE_DIR)"
-	zip -j -9 "$(PACKAGE_DIR)/$(VERSION)_$(PROJECTNAME)_megaduck.zip"            README.md build/duck/*.duck
-	zip -j -9 "$(PACKAGE_DIR)/$(VERSION)_$(PROJECTNAME)_gameboy.zip"             README.md build/gb/*.gb
+	zip -j -9 "$(PACKAGE_DIR)/$(VERSION)_$(PROJECTNAME)_megaduck_$(LOCAL_ONLY_FILENAME).zip"            README.md build/duck/*.duck
+	zip -j -9 "$(PACKAGE_DIR)/$(VERSION)_$(PROJECTNAME)_gameboy_$(LOCAL_ONLY_FILENAME).zip"             README.md build/gb/*.gb
 
 
 # Include available build targets
