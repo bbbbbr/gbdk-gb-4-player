@@ -47,6 +47,8 @@ When GBA-SP (and possibly original GBA) model Game Boys are connected to the DMG
 
 So, when those models are powered-off, make sure to disconnect them from the Four Player adapter.
 
+This may apply to other Game Boy models or FPGA clones.
+
 
 # Bare ISR vector vs GBDK ISR dispatcher
 In this example a fixed serial ISR is used (`ISR_VECTOR()`) instead of the default GBDK serial interrupt dispatcher (`add_SIO()`) with installable ISR handlers since it has slightly lower call overhead.
