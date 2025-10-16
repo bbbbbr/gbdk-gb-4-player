@@ -13,63 +13,29 @@
 #include "print.h"
 
 
-const char str_you_lost[] =
-    " @ @ @ @ @ @ \n"
-    "@ YOU  LOST @\n"
-    " @ @ @ @ @ @ " ;
+const char str_you_lost[] =  "@@@@@ YOU LOST @@@@@";
+const char str_you_won[] =   "+++++ YOU  WON +++++";
+const char str_all_lost[] =  "@@@@ NOBODY WON @@@@";
+const char str_game_over[] = "@@@@ GAME  OVER @@@@";
 
-const char str_you_won[] =
-    " + + + + + \n"
-    "+ YOU WON +\n"
-    " + + + + + " ;
-
-const char str_all_lost[] =
-    " @ @ @ @ @ @ @ \n"
-    "@ NOBODY  WON  @\n"
-    " @ @ @ @ @ @ @ " ;
-
-const char str_game_over[] =
-    " @ @ @ @ @ @ \n"
-    "@ GAME OVER @\n"
-    " @ @ @ @ @ @ " ;
-
-#define MSG_HEIGHT           3u
-#define MSG_LOST_WIDTH      13u  // Multi-player  mode
-#define MSG_WON_WIDTH       11u  // Multi-player  mode
-#define MSG_ALL_LOST_WIDTH  15u  // Multi-player  mode
-#define MSG_GAME_OVER_WIDTH 13u  // Single player mode
-
-#define MSG_Y           ((BOARD_HEIGHT - MSG_HEIGHT) / 2u)
-#define MSG_X_LOST      ((BOARD_WIDTH - MSG_LOST_WIDTH) / 2u)
-#define MSG_X_WON       ((BOARD_WIDTH - MSG_WON_WIDTH) / 2u)
-#define MSG_X_ALL_LOST  ((BOARD_WIDTH - MSG_ALL_LOST_WIDTH) / 2u)
-#define MSG_X_GAME_OVER ((BOARD_WIDTH - MSG_ALL_LOST_WIDTH) / 2u)
-
+#define MSG_Y           (BOARD_HEIGHT)  // Bottom of screen
+#define MSG_X            0u
 
 
 void gameover_show_end_game_message(void) {
 
-    uint8_t x = 0u;
     const char * str = "";
-
     switch( GAMEPLAY_GET_THIS_PLAYER_STATUS() ) {
-        case PLAYER_STATUS_LOST: x = MSG_X_LOST;
-                                 str = str_you_lost;
+        case PLAYER_STATUS_LOST: str = str_you_lost;
                                  break;
-
-        case PLAYER_STATUS_WON: x = MSG_X_WON;
-                                 str = str_you_won;
+        case PLAYER_STATUS_WON: str = str_you_won;
                                  break;
-
-        case PLAYER_STATUS_ALL_LOST: x = MSG_X_ALL_LOST;
-                                 str = str_all_lost;
+        case PLAYER_STATUS_ALL_LOST: str = str_all_lost;
                                  break;
-
-        case PLAYER_STATUS_GAME_OVER: x = MSG_X_GAME_OVER;
-                                 str = str_game_over;
+        case PLAYER_STATUS_GAME_OVER: str = str_game_over;
                                  break;
     }
-    print_gotoxy(x, MSG_Y, PRINT_BKG);
+    print_gotoxy(MSG_X, MSG_Y, PRINT_BKG);
     print_str(str);
 
     hide_sprites_range(0, MAX_HARDWARE_SPRITES);
