@@ -36,6 +36,8 @@ Eating hearts grows your snake and deposits skulls. When a snake crashes into sk
 
 When only one player is connected to the DMG-07 then the objective is just to make as long a snake as possible.
 
+Tip: You can enter the Konami code on the title screen of any participating console and the game will run in an alternate Snafu-like gameplay mode.
+
 # Controls
 - Move Snake: D-PAD
 - Pause: START
