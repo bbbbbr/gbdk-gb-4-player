@@ -16,9 +16,9 @@ Thinking about making a game that uses the 4 Player adapter? You are welcome (an
 
 
 # Game Implementation
-In this game the approach to solve potential synchronization issues across four consoles is as follows.
+In this game the approach to solve synchronization across four consoles uses "deterministic lockstep".
 - The game runs in exact lock-step across all the consoles aside from display timing.
-- __All__ input is routed through the 4-player adapter and __only__ used after being received from it.
+- __All__ input is routed through the 4-player adapter and __only__ used after being received from it (by all consoles at the same time).
 - The game state only ticks when 4-player packets are received (~about once per frame with the configured timing, so it adds 1 frame of input lag).
 
 As a result of this, consoles broadcast a keep-alive heart beat when not sending button events. Due to the parallel nature, if a player dies on one console then they also die in the exact same manner/location/game timing on all the other consoles.
