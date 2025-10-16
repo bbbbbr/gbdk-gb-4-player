@@ -40,7 +40,7 @@ void main(void){
 
     while (1) {
         #ifdef DEBUG_LOCAL_SINGLE_PLAYER_ONLY
-            title_screen_init();
+            title_screen_run();
             fade_out();
 
             gameplay_run_local_only();

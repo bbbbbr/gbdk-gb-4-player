@@ -18,6 +18,16 @@ bool    game_players_all_signaled_ready;
 uint8_t game_players_ready_expected;
 uint8_t game_players_ready_status;
 
+uint8_t game_mode_requested;
+uint8_t game_mode;
+
+// Should be called from title screen before any gameplay init happens
+void gameplay_reset_mode(void) {
+    game_mode_requested = GAME_MODE_DEFAULT;
+    game_mode = GAME_MODE_DEFAULT;
+}
+
+
 static void gameplay_init(void) {
 
     // Takes at least 6 frames with screen on
@@ -100,6 +110,20 @@ static bool process_packets(void) {
 }
 
 
+static void gameplay_send_ready_cmd(void) {
+    // Player indicator
+    uint8_t tx_cmd_and_data = PLAYER_1 << WHICH_PLAYER_AM_I_ZERO_BASED();
+
+    // Which ready command to send
+    if (game_mode_requested == GAME_MODE_SNAFU)
+        tx_cmd_and_data |= _SIO_CMD_READY_SNAFU_MODE;
+    else
+        tx_cmd_and_data |= _SIO_CMD_READY;
+
+    four_player_set_xfer_data(tx_cmd_and_data );
+}
+
+
 void gameplay_run(void){
 
     gameplay_init();
@@ -126,7 +150,7 @@ void gameplay_run(void){
         // Send ready signal with player bit once per frame
         // until all player consoles are ready
         if (game_players_all_signaled_ready == false) {
-            four_player_set_xfer_data(_SIO_CMD_READY | (PLAYER_1 << WHICH_PLAYER_AM_I_ZERO_BASED()) );
+            gameplay_send_ready_cmd();
         }
 
         // Exit title screen once mode is switched to PING
@@ -190,9 +214,13 @@ void gameplay_run(void){
 
         // Debug, set only local player present
         _4p_connect_status = _4P_PLAYER_1 | PLAYER_1;
+        // _4p_connect_status = _4P_PLAYER_2 | PLAYER_2;
+        // _4p_connect_status = _4P_PLAYER_3 | PLAYER_3;
+        // _4p_connect_status = _4P_PLAYER_4 | PLAYER_4;
         // _4p_connect_status = (_4P_PLAYER_1 | _4P_PLAYER_3) | PLAYER_1;
         // _4p_connect_status = (_4P_PLAYER_1 | _4P_PLAYER_2 | _4P_PLAYER_3 | _4P_PLAYER_4) | PLAYER_1;
 
+        game_mode = game_mode_requested;
         gameplay_init();
 
         _4p_mock_init_xfer_buffers();

@@ -6,6 +6,8 @@
 #include "fade.h"
 #include "util.h"
 #include "4_player_adapter.h"
+#include "magic_code.h"
+#include "gameplay.h"
 
 #include "gfx.h"
 
@@ -39,6 +41,9 @@ void title_screen_init(void) {
     hide_sprites_range(0, MAX_HARDWARE_SPRITES);
     SHOW_SPRITES;
     fade_in();
+
+    gameplay_reset_mode();
+    magic_code_reset();
 }
 
 
@@ -82,17 +87,31 @@ void title_screen_run(void){
         UPDATE_KEYS();
         vsync_or_sio_4P_mode_change();
 
-        // Exit title screen once mode is switched to XFER
-        if (GET_CURRENT_MODE() == _4P_STATE_XFER)
-            return;
+        #ifndef DEBUG_LOCAL_SINGLE_PLAYER_ONLY
+            // Exit title screen once mode is switched to XFER
+            if (GET_CURRENT_MODE() == _4P_STATE_XFER)
+                return;
+        #endif
 
         update_connection_display();
 
         if (KEY_TICKED(J_START)) {
-            // Any player can start the game
-            // if (WHICH_PLAYER_AM_I() == PLAYER_1) {
-                four_player_request_change_to_xfer_mode();
-            //}
+                #ifdef DEBUG_LOCAL_SINGLE_PLAYER_ONLY
+                    return;
+                #else
+                    four_player_request_change_to_xfer_mode();
+                #endif
         }
+
+        if (KEY_TICKED(J_ANY)) {
+            if (magic_code_update() == true) {
+                // If konami code entered, play a sound and switch to SNAFU MODE
+                // Flash screen for N frames
+                // This will be broadcast as a flag in the READY command for all other consoles to pick up        
+                magic_code_sound_chime();
+                game_mode_requested = GAME_MODE_SNAFU;
+            }
+        }
+
     }
 }

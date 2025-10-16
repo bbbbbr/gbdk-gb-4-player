@@ -44,6 +44,7 @@ snake_t snakes[PLAYER_NUM_MAX];
 
 uint8_t snakes_player_count;
 uint8_t snakes_alive_count;
+bool    snakes_body_tail_redraw_required;
 
 // Laid out as Rows, so: (y * BOARD_WIDTH) + x -> BOARD_INDEX(x,y)
 uint8_t game_board[BOARD_WIDTH * BOARD_HEIGHT];
@@ -125,6 +126,7 @@ static uint8_t snake_calc_tile_tail(uint8_t p_num, uint8_t dir);
 static uint8_t snake_calc_tile_body(uint8_t p_num);
 
 static void snake_board_reset(void);
+static void snakes_init_redraw_body_tail(void);
 
 static void snakes_handle_disconnect(uint8_t p_num);
 static void snake_render_dead(uint8_t p_num, bool got_disconnected);
@@ -220,7 +222,12 @@ static uint8_t snake_calc_tile_head(uint8_t p_num) {
     // Draw tile for player
     // Use different tile / color for this player vs others
     uint8_t tile_id = snake_tile_head_lut[ snakes[p_num].dir ];
-    if (WHICH_PLAYER_AM_I_ZERO_BASED() != p_num) tile_id += TILE_OTHERS_OFFSET;
+    if (GAME_MODE_GET() == GAME_MODE_SNAFU) {
+        // Make the current player always the black snake
+        tile_id += ((p_num - WHICH_PLAYER_AM_I_ZERO_BASED()) & 0x03u) * TILES_PER_SNAKE;
+    } else {
+        if (WHICH_PLAYER_AM_I_ZERO_BASED() != p_num) tile_id += TILE_OTHERS_OFFSET;
+    }
 
     return tile_id;
 }
@@ -231,7 +238,13 @@ static uint8_t snake_calc_tile_tail(uint8_t p_num, uint8_t dir) {
     // Draw tile for player
     // Use different tile for this player vs others
     uint8_t tile_id = snake_tile_tail_lut[ dir ];
-    if (WHICH_PLAYER_AM_I_ZERO_BASED() != p_num) tile_id += TILE_OTHERS_OFFSET;
+
+    if (GAME_MODE_GET() == GAME_MODE_SNAFU) {
+        // Make the current player always the black snake
+        tile_id += ((p_num - WHICH_PLAYER_AM_I_ZERO_BASED()) & 0x03u) * TILES_PER_SNAKE;
+    } else {
+        if (WHICH_PLAYER_AM_I_ZERO_BASED() != p_num) tile_id += TILE_OTHERS_OFFSET;
+    }
 
     return tile_id;
 }
@@ -247,7 +260,12 @@ static uint8_t snake_calc_tile_body(uint8_t p_num) {
     else
         tile_id = snake_tile_body_vert_lut[ snakes[p_num].dir_prev | snakes[p_num].dir ];
 
-    if (WHICH_PLAYER_AM_I_ZERO_BASED() != p_num) tile_id += TILE_OTHERS_OFFSET;
+    if (GAME_MODE_GET() == GAME_MODE_SNAFU) {
+        // Make the current player always the black snake
+        tile_id += ((p_num - WHICH_PLAYER_AM_I_ZERO_BASED()) & 0x03u) * TILES_PER_SNAKE;
+    } else {
+        if (WHICH_PLAYER_AM_I_ZERO_BASED() != p_num) tile_id += TILE_OTHERS_OFFSET;
+    }
 
     return tile_id;
 }
@@ -265,7 +283,9 @@ static void snake_board_reset(void) {
 
     // Start with one food pellet in the middle
     rand_and_food_reset();
-    food_spawn_single_in_center();
+    if (GAME_MODE_GET() != GAME_MODE_SNAFU) {
+        food_spawn_single_in_center();
+    }
 }
 
 
@@ -276,6 +296,7 @@ void snakes_init_and_draw(void) {
         input_found = false;
     #endif
 
+    snakes_body_tail_redraw_required = false;  // For Snafu mode
     snakes_alive_count    = 0u; // Reset to zero, increment +1 for every connected player
     game_tick             = 0u;
     game_tick_speed       = GAME_TICK_SPEED_START;
@@ -335,6 +356,28 @@ void snakes_init_and_draw(void) {
 }
 
 
+// Kind of a hack, but for SNAFU mode a redraw has to happen after the mode
+// has been set (via ready sync), which is after the snakes have already been
+// drawn. So the snakes need a redraw for the different SNAFU coloring
+void snakes_init_redraw_body_tail(void) {
+
+    uint8_t player_id_bit = _4P_PLAYER_1;
+    for (uint8_t c = 0u; c < PLAYER_NUM_MAX; c++) {
+        if (IS_PLAYER_CONNECTED(player_id_bit)) {
+
+            // Have to set up and record the snake head/body/tail on the board before drawing
+            uint8_t head_x =  PLAYER_X_HEAD_START_STEP * (c + 1u);
+            uint8_t head_y =  PLAYER_Y_HEAD_START;
+
+            // Now draw them
+            set_bkg_tile_xy(head_x, head_y + 1, snake_calc_tile_body(c));
+            set_bkg_tile_xy(head_x, head_y + 2, snake_calc_tile_tail(c, snakes[c].dir));
+        }
+        player_id_bit <<= 1;
+    }
+}
+
+
 // Called when a given console is detected as disconnected from the game
 static void snakes_handle_disconnect(uint8_t p_num) {
     snakes[p_num].is_alive = false;
@@ -348,13 +391,18 @@ static void snakes_handle_disconnect(uint8_t p_num) {
 static void snake_render_dead(uint8_t p_num, bool got_disconnected) {
 
     static bool    is_this_player;
-    static uint8_t skull_icon;
+    static uint8_t draw_tile;
     static uint8_t head_x, head_y;
 
     is_this_player = WHICH_PLAYER_AM_I_ZERO_BASED() == p_num;
-    skull_icon = (is_this_player) ? BOARD_TILE_SKULL_DARK : BOARD_TILE_SKULL_LITE;
-    // If the player died via disconnect, render X's instead of skulls
-    if (got_disconnected) skull_icon = BG_FONT_NUMS_TILES_START + BG_FONT_X; // BG_FONT_NUMS_TILES_START + p_num; // (for debug, can use snake number as tile)
+    if (GAME_MODE_GET() == GAME_MODE_SNAFU) {
+        got_disconnected;  // Unused warning shim
+        draw_tile = BOARD_CLEAR;
+    } else {
+        draw_tile = (is_this_player) ? BOARD_TILE_SKULL_DARK : BOARD_TILE_SKULL_LITE;
+        // If the player died via disconnect, render X's instead of skulls
+        if (got_disconnected) draw_tile = BG_FONT_NUMS_TILES_START + BG_FONT_X; // BG_FONT_NUMS_TILES_START + p_num; // (for debug, can use snake number as tile)
+    }
 
     head_x = snakes[p_num].head_x;
     head_y = snakes[p_num].head_y;
@@ -364,13 +412,18 @@ static void snake_render_dead(uint8_t p_num, bool got_disconnected) {
 
     // Traverse snake from tail to head
     while (1) {
-        // Render a skull icon onto current snake tile, set it into board
-        set_bkg_tile_xy(x, y, skull_icon);
+        // Render a skull (or blank, etc)  icon onto current snake tile, set it into board
+        set_bkg_tile_xy(x, y, draw_tile);
 
         uint8_t * p_board = game_board + BOARD_INDEX(x, y);
-        // Clear board at current (soon to be former) tail position
         uint8_t board_data = *p_board;
-        *p_board = BOARD_COLLISION_BIT;
+        // Update board at current tile to be a collision
+        // (except in snafu mode, where the snake gets Erased instead)
+        if (GAME_MODE_GET() == GAME_MODE_SNAFU) {
+            *p_board = BOARD_CLEAR;
+        } else {
+            *p_board = BOARD_COLLISION_BIT;
+        }
 
         // Exit loop when the head is reached and overwritten
         if ((x == head_x) && (y == head_y)) break;
@@ -445,7 +498,12 @@ static uint8_t snake_try_head_increment(uint8_t p_num) {
         snakes[p_num].head_x = head_x;
         snakes[p_num].head_y = head_y;
 
+        // Snafu game mode: always increment head, no food required
+        if (GAME_MODE_GET() == GAME_MODE_SNAFU)
+            return HEAD_INC_GROW_SNAKE;
+
         // Check for food at new location
+        // TODO: Sound : PLAY_SOUND_TILE_CLEAR_SPECIAL PlayFx(CHANNEL_1, 30, 0x1C, 0x81, 0xF1, 0x73, 0x86)
         if (board_data_new & BOARD_FOOD_BIT)
             return HEAD_INC_GROW_SNAKE; // Success, and grow snake (i.e. don't increment tail)
         else
@@ -616,42 +674,56 @@ static bool snake_check_for_input(uint8_t p_num) {
     uint8_t cmd     =  value & _SIO_CMD_MASK;
     uint8_t payload =  value & _SIO_DATA_MASK;
 
-    // D-Pad input type command
-    if (cmd == _SIO_CMD_DPAD) {
+    switch (cmd) {
+        case _SIO_CMD_DPAD:
+            // D-Pad input type command
+            if (!rand_initialized) rand_update_seed();
 
-        if (!rand_initialized) rand_update_seed();
+            // Save D-Pad button press for when the snake is next able to turn
+            uint8_t dir_request = payload;
+            uint8_t dir_opposite = dir_opposite_LUT[dir_request];
 
-        // Save D-Pad button press for when the snake is next able to turn
-        uint8_t dir_request = payload;
-        uint8_t dir_opposite = dir_opposite_LUT[dir_request];
-
-        // Filter out diagonals (they are marked as PLAYER_DIR_NONE in the LUT)
-        if (dir_opposite != PLAYER_DIR_NONE) {
-            // Block snake turning back onto itself
-            if (dir_request && (snakes[p_num].dir != dir_opposite)) {
-                snakes[p_num].dir_next = dir_request;
-                return true;
+            // Filter out diagonals (they are marked as PLAYER_DIR_NONE in the LUT)
+            if (dir_opposite != PLAYER_DIR_NONE) {
+                // Block snake turning back onto itself
+                if (dir_request && (snakes[p_num].dir != dir_opposite)) {
+                    snakes[p_num].dir_next = dir_request;
+                    return true;
+                }
             }
-        }
-    }
-    else if (cmd == _SIO_CMD_BUTTONS) {
-        if (payload == BUTTON_START)
-            game_toggle_pause_requested = true;
-    }
-    else if (cmd == _SIO_CMD_READY) {
-        game_players_ready_status |= payload;
-        if (game_players_ready_status == game_players_ready_expected)
-            game_players_all_signaled_ready = true;
-    }
-    else if (cmd == _SIO_CMD_HEARTBEAT) {
-        // Default keep alive heartbeat when no other commands sent, no action here
-    }
-    else {
-        // No heartbeat or command? Mark player as disconnected
-        // (a single packet missed can trigger disconnect, in this game's approach that's necessary)
-        #ifndef DEBUG_LOCAL_SINGLE_PLAYER_ONLY
-            if (game_players_all_signaled_ready) snakes[p_num].got_disconnected = true;
-        #endif
+            break;
+
+        case _SIO_CMD_BUTTONS:
+            if (payload == BUTTON_START)
+                game_toggle_pause_requested = true;
+                break;
+
+        case _SIO_CMD_READY_SNAFU_MODE:
+            GAME_MODE_SET(GAME_MODE_SNAFU);
+            snakes_body_tail_redraw_required = true;
+            // Now fall through to regular ready command processing
+        case _SIO_CMD_READY:
+            game_players_ready_status |= payload;
+            if (game_players_ready_status == game_players_ready_expected)
+                game_players_all_signaled_ready = true;
+
+                if (snakes_body_tail_redraw_required) {
+                    snakes_init_redraw_body_tail();
+                    snakes_body_tail_redraw_required = false;
+                }
+                break;
+
+        case _SIO_CMD_HEARTBEAT:
+            // Default keep alive heartbeat when no other commands sent, no action here
+            break;
+
+        default:
+            // No heartbeat or command? Mark player as disconnected
+            // (a single packet missed can trigger disconnect, in this game's approach that's necessary)
+            #ifndef DEBUG_LOCAL_SINGLE_PLAYER_ONLY
+                if (game_players_all_signaled_ready) snakes[p_num].got_disconnected = true;
+            #endif
+            break;
     }
 
     return false;
@@ -782,12 +854,14 @@ bool snakes_tick_game(void) {
             input_found = false;
         #endif
 
-        // Only spawn food when there is none
-        if (food_currently_spawned_count < FOOD_SPAWNED_MAX) {
-            if (food_spawn_timer == FOOD_TIMER_COUNT_DONE) {
-                if (rand_initialized) food_spawn_new();  // Also resets spawn timer
+        if (GAME_MODE_GET() != GAME_MODE_SNAFU) {
+            // Only spawn food when there is none
+            if (food_currently_spawned_count < FOOD_SPAWNED_MAX) {
+                if (food_spawn_timer == FOOD_TIMER_COUNT_DONE) {
+                    if (rand_initialized) food_spawn_new();  // Also resets spawn timer
+                }
+                else food_spawn_timer--;
             }
-            else food_spawn_timer--;
         }
     }
 

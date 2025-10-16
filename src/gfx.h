@@ -33,7 +33,7 @@
 // Tile shared between sprites and BKG
 #define SPR_BKG_SHARED_TILE_START     128u
 
-#define TILES_PER_SNAKE ((snake_tiles_TILE_COUNT / 2u))
+#define TILES_PER_SNAKE ((snake_tiles_TILE_COUNT / 4u))
 
 #define SNAKE_TILES_START             (SPR_BKG_SHARED_TILE_START)
   #define SNAKE_TILE_YOURS_HEAD        (SNAKE_TILES_START + 0u)       // Order is R,L,U,D

@@ -27,6 +27,8 @@
 
 #define ENABLE_SPAWN_HAZARD_AFTER_EATING
 
+#define SNAFU_MODE  // Snafu tron-light cycle like game mode
+
 // Buttons are downshifted here since they are transmitted in
 // the lower 4 bits via the _SIO_CMD_BUTTONS packet type
 #define BUTTON_START   ((J_START) >> 4)
@@ -43,10 +45,11 @@
 #define _SIO_CMD_MASK  0xF0u
 #define _SIO_DATA_MASK 0x0Fu
 
-#define _SIO_CMD_DPAD      0x80u
-#define _SIO_CMD_BUTTONS   0x90u
-#define _SIO_CMD_READY     0xA0u
-#define _SIO_CMD_HEARTBEAT 0xB0u
+#define _SIO_CMD_DPAD             0x80u
+#define _SIO_CMD_BUTTONS          0x90u
+#define _SIO_CMD_READY            0xA0u
+#define _SIO_CMD_READY_SNAFU_MODE 0xB0u
+#define _SIO_CMD_HEARTBEAT        0xC0u
 
 
 #endif // _COMMON_H
