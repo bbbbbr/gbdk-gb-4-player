@@ -1,0 +1,57 @@
+{
+	"$baseURI": "https://yal.cc/r/20/pixelfont/",
+	"$version": "1.0",
+	"in-glyphs": [
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.!?:-+_/\\() "
+	],
+	"glyph-color": "black",
+	"glyph-width": 8,
+	"glyph-height": 8,
+	"glyph-ofs-x": 0,
+	"glyph-ofs-y": 0,
+	"glyph-sep-x": 0,
+	"glyph-sep-y": 0,
+	"glyph-base-x": 0,
+	"glyph-baseline": 8,
+	"glyph-spacing": 0,
+	"font-is-mono": true,
+	"font-em-square": 1024,
+	"font-line-gap": 0,
+	"font-ascend": 1024,
+	"font-descend": 0,
+	"font-px-size": 64,
+	"contour-type": "smart",
+	"font-type": "ttf",
+	"font-is-upper": true,
+	"font-name": "Pixel Den of Snakes Four Player Regular 8x8 Mono",
+	"font-style": "Regular",
+	"font-author": "bbbbbr",
+	"font-copy": "(c) 2025",
+	"font-version-major": 1,
+	"font-version-minor": 0,
+	"font-desc": "Font by bbbbbr. 2025. Font created  for game UI text of the Den of Snakes four player game for the Game Boy",
+	"font-license": "CC0 Public Domain",
+	"font-license-url": "https://bbbbbr.itch.io/den-of-snakes-four-player",
+	"font-sample-text": [
+		"Den of Snakes Game Boy Four Player!"
+	],
+	"font-embedding": "4",
+	"font-weight-class": "400",
+	"font-width-class": "5",
+	"font-creation-date": "2025-10-23",
+	"font-creation-time": "02:33",
+	"font-modification-date": "2025-10-26",
+	"font-modification-time": "02:28",
+	"font-modification-auto": true,
+	"overrides": [
+		"# hide the pixels of the \"space\" characters!",
+		"# (but they'll still have a width)",
+		"hide \\s",
+		""
+	],
+	"font-preview-text": [
+		"THE QUICK BROWN FOX JUMPS OVER A LAZY DOG.",
+		"the quick brown fox jumps over a lazy dog.",
+		"0123456789"
+	]
+}
